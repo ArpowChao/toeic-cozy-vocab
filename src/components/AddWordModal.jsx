@@ -1,363 +1,345 @@
-import React, { useState } from 'react';
-import { X, Sparkles, Plus, Layers, Loader2, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Sparkles, Plus, Layers, Loader2, CheckCircle2, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { lookupWordOnline } from '../services/dictionaryService.js';
 import { saveWord, saveWordsBatch } from '../services/storageService.js';
+import { soundEffects } from '../services/ttsService.js';
 
 export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
-  const [activeTab, setActiveTab] = useState('single'); // 'single' | 'batch'
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('quick'); // 'quick' | 'batch'
   const [wordInput, setWordInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastAddedWord, setLastAddedWord] = useState(null);
+  const [batchText, setBatchText] = useState('');
+  const [batchProgress, setBatchProgress] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   
-  // Single Word Form State
-  const [formData, setFormData] = useState({
-    word: '',
-    ipa: '',
+  // Optional advanced manual overrides
+  const [advancedData, setAdvancedData] = useState({
     pos: 'v.',
     level: 'L2',
-    category: '商務日常',
+    category: '自訂生詞',
     simpleDefinition: '',
     collocation: '',
     example: '',
-    exampleZh: '',
     chinese: '',
-    toeicTip: '',
   });
 
-  // Batch Form State
-  const [batchText, setBatchText] = useState('');
-  const [batchLevel, setBatchLevel] = useState('L2');
-  const [batchCategory, setBatchCategory] = useState('自訂生詞');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+      setLastAddedWord(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Auto Lookup for Single Word
-  const handleAutoLookup = async (e) => {
+  // Ultra-Fast Zero-Effort Quick Add
+  const handleQuickAdd = async (e) => {
     e?.preventDefault();
-    const query = (formData.word || wordInput).trim();
+    const query = wordInput.trim();
     if (!query) return;
 
     setIsLoading(true);
+    setLastAddedWord(null);
+
     try {
-      const result = await lookupWordOnline(query);
-      if (result) {
-        setFormData((prev) => ({
-          ...prev,
-          ...result,
-          level: prev.level || result.level,
-          category: prev.category || result.category,
-        }));
-      }
+      // 1. Fully automate online lookup (IPA, POS, English Definition, Collocation, Example, Chinese)
+      const enriched = await lookupWordOnline(query);
+      
+      const newWord = {
+        ...(enriched || {}),
+        word: query,
+        id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        level: advancedData.level || enriched?.level || 'L2',
+        category: advancedData.category || enriched?.category || '自訂生詞',
+        simpleDefinition: advancedData.simpleDefinition || enriched?.simpleDefinition || `to manage or apply ${query}`,
+        collocation: advancedData.collocation || enriched?.collocation || `${query} [in business context]`,
+        example: advancedData.example || enriched?.example || `Please review the ${query} for the upcoming meeting.`,
+        chinese: advancedData.chinese || enriched?.chinese || '（可於複習時隨時查看）',
+        state: 'new',
+        repetition: 0,
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: null,
+      };
+
+      await saveWord(newWord);
+      onWordAdded(newWord);
+      soundEffects.playSuccess();
+
+      setLastAddedWord(newWord);
+      setWordInput('');
+      setAdvancedData({
+        pos: 'v.',
+        level: 'L2',
+        category: '自訂生詞',
+        simpleDefinition: '',
+        collocation: '',
+        example: '',
+        chinese: '',
+      });
+      setShowAdvanced(false);
+
+      // Keep focus for next rapid word entry
+      setTimeout(() => inputRef.current?.focus(), 50);
     } catch (err) {
-      console.error('Lookup failed', err);
+      console.error('Quick add failed:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSaveSingle = async (e) => {
-    e.preventDefault();
-    if (!formData.word.trim()) return;
+  // Batch Add with Automated Enrichment
+  const handleBatchAdd = async (e) => {
+    e?.preventDefault();
+    const rawWords = batchText
+      .split(/[\n,]+/)
+      .map((w) => w.trim().toLowerCase())
+      .filter((w) => w.length > 0);
 
-    const newWord = {
-      ...formData,
-      id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      state: 'new',
-      repetition: 0,
-      interval: 0,
-      easeFactor: 2.5,
-      dueDate: null,
-    };
-
-    await saveWord(newWord);
-    onWordAdded(newWord);
-    resetForm();
-    onClose();
-  };
-
-  const handleSaveBatch = async (e) => {
-    e.preventDefault();
-    const lines = batchText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-
-    if (lines.length === 0) return;
+    if (rawWords.length === 0) return;
 
     setIsLoading(true);
-    const wordsToSave = lines.map((w, index) => ({
-      id: `batch-${Date.now()}-${index}`,
-      word: w,
-      ipa: `/${w}/`,
-      pos: 'n./v.',
-      level: batchLevel,
-      category: batchCategory,
-      simpleDefinition: `English concept for ${w}`,
-      collocation: `${w} in business context`,
-      example: `Please make sure to review the ${w} carefully.`,
-      exampleZh: '',
-      chinese: '（待複習時補充中文）',
-      toeicTip: '自訂匯入單字，請多利用搭配詞記憶。',
-      state: 'new',
-      repetition: 0,
-      interval: 0,
-      easeFactor: 2.5,
-      dueDate: null,
-    }));
+    const enrichedList = [];
 
-    await saveWordsBatch(wordsToSave);
-    onWordAdded(wordsToSave);
+    for (let i = 0; i < rawWords.length; i++) {
+      const w = rawWords[i];
+      setBatchProgress(`正在自動解析 (${i + 1}/${rawWords.length})：${w}...`);
+      try {
+        const enriched = await lookupWordOnline(w);
+        enrichedList.push({
+          ...(enriched || {}),
+          word: w,
+          id: `batch-${Date.now()}-${i}`,
+          state: 'new',
+          repetition: 0,
+          interval: 0,
+          easeFactor: 2.5,
+          dueDate: null,
+        });
+      } catch {
+        enrichedList.push({
+          id: `batch-${Date.now()}-${i}`,
+          word: w,
+          ipa: `/${w}/`,
+          pos: 'n./v.',
+          level: 'L2',
+          category: '自訂生詞',
+          simpleDefinition: `Concept for ${w}`,
+          collocation: `${w} in business context`,
+          example: `Please review ${w} carefully.`,
+          chinese: '（待複習）',
+          state: 'new',
+          repetition: 0,
+          interval: 0,
+          easeFactor: 2.5,
+          dueDate: null,
+        });
+      }
+    }
+
+    await saveWordsBatch(enrichedList);
+    onWordAdded(enrichedList);
+    soundEffects.playSuccess();
     setIsLoading(false);
+    setBatchProgress(null);
     setBatchText('');
     onClose();
   };
 
-  const resetForm = () => {
-    setWordInput('');
-    setFormData({
-      word: '',
-      ipa: '',
-      pos: 'v.',
-      level: 'L2',
-      category: '商務日常',
-      simpleDefinition: '',
-      collocation: '',
-      example: '',
-      exampleZh: '',
-      chinese: '',
-      toeicTip: '',
-    });
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cozyDark-500/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden paper-shadow border border-cream-300 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cozyDark-500/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl w-full max-w-xl overflow-hidden paper-shadow border border-cream-300 max-h-[90vh] flex flex-col">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200 bg-cream-50">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amberGold-100 flex items-center justify-center text-amberGold-600">
-              <Plus className="w-4 h-4" />
+        <div className="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-cream-200 bg-cream-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amberGold-100 flex items-center justify-center text-amberGold-700 font-bold shadow-xs">
+              <Plus className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-latte-800">新增個人單字</h2>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-latte-800">快速加入生詞</h2>
+              <p className="text-xs text-cozyDark-200">只需輸入英文，其餘（音標/英英/搭配詞/例句）系統全自動搞定</p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-cozyDark-100 hover:text-cozyDark-400 hover:bg-cream-200 transition"
+            className="p-2 rounded-2xl text-cozyDark-100 hover:text-cozyDark-400 hover:bg-cream-200 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex px-6 pt-3 border-b border-cream-200 gap-4 bg-white">
+        <div className="flex px-6 sm:px-8 pt-3 border-b border-cream-200 gap-6 bg-white text-xs sm:text-sm">
           <button
-            onClick={() => setActiveTab('single')}
-            className={`pb-2.5 text-sm font-semibold transition border-b-2 ${
-              activeTab === 'single'
-                ? 'border-latte-500 text-latte-700'
-                : 'border-transparent text-cozyDark-100 hover:text-latte-600'
+            onClick={() => setActiveTab('quick')}
+            className={`pb-3 font-bold transition border-b-2 ${
+              activeTab === 'quick'
+                ? 'border-latte-600 text-latte-800'
+                : 'border-transparent text-cozyDark-200 hover:text-latte-600'
             }`}
           >
-            單筆智能解析錄入
+            ⚡ 極速單字錄入 (只打字按 Enter)
           </button>
           <button
             onClick={() => setActiveTab('batch')}
-            className={`pb-2.5 text-sm font-semibold transition border-b-2 ${
+            className={`pb-3 font-bold transition border-b-2 ${
               activeTab === 'batch'
-                ? 'border-latte-500 text-latte-700'
-                : 'border-transparent text-cozyDark-100 hover:text-latte-600'
+                ? 'border-latte-600 text-latte-800'
+                : 'border-transparent text-cozyDark-200 hover:text-latte-600'
             }`}
           >
-            批次快速貼上匯入
+            📋 一次貼上多個單字
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4">
-          {activeTab === 'single' ? (
-            <form onSubmit={handleSaveSingle} className="space-y-4">
-              {/* Word Input + Auto Enrich Button */}
+        <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-5">
+          {activeTab === 'quick' ? (
+            <form onSubmit={handleQuickAdd} className="space-y-5">
+              {/* Success Notification */}
+              {lastAddedWord && (
+                <div className="p-4 rounded-2xl bg-sage-50 border border-sage-200 text-sage-800 text-xs sm:text-sm animate-fade-in flex items-start gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-sage-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold">
+                      🎉 已自動補全並加入「{lastAddedWord.word}」！
+                    </div>
+                    <div className="text-xs text-sage-700 mt-1">
+                      釋義：{lastAddedWord.simpleDefinition}
+                    </div>
+                    <div className="text-[11px] text-sage-600 mt-0.5">
+                      搭配詞：{lastAddedWord.collocation}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Big Clean Input Box */}
               <div>
-                <label className="block text-xs font-bold text-latte-700 uppercase mb-1">
-                  英文單字 (English Word)
+                <label className="block text-xs sm:text-sm font-black text-latte-800 mb-2">
+                  🔤 請輸入英文單字 (English Word)
                 </label>
-                <div className="flex gap-2">
+                <div className="relative">
                   <input
+                    ref={inputRef}
                     type="text"
                     required
-                    placeholder="例: negotiate, prospective..."
-                    value={formData.word}
-                    onChange={(e) => setFormData({ ...formData, word: e.target.value })}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-cream-300 focus:outline-none focus:ring-2 focus:ring-latte-400 text-sm font-semibold text-latte-800"
+                    disabled={isLoading}
+                    placeholder="例如: consolidate, allocate, prospect..."
+                    value={wordInput}
+                    onChange={(e) => setWordInput(e.target.value)}
+                    className="w-full px-5 py-4 rounded-2xl border-2 border-cream-300 text-lg sm:text-xl font-bold text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400 shadow-inner disabled:bg-cream-100"
                   />
-                  <button
-                    type="button"
-                    onClick={handleAutoLookup}
-                    disabled={isLoading || !formData.word}
-                    className="px-4 py-2.5 bg-amberGold-400 hover:bg-amberGold-500 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    自動解析
-                  </button>
                 </div>
-                <p className="text-[11px] text-cozyDark-100 mt-1">
-                  輸入單字後點擊「自動解析」，將為您自動補全音標、英英釋義、搭配詞與例句。
+                <p className="text-xs text-cozyDark-200 mt-2 font-medium">
+                  💡 打完單字直接按鍵盤 <kbd className="px-1.5 py-0.5 bg-cream-200 rounded text-latte-800 font-bold">Enter</kbd>，系統將自動解析音標、英英定義、商務搭配詞與例句並直接存入！
                 </p>
               </div>
 
-              {/* Meta row: POS, Level, Category */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-cozyDark-200 mb-1">詞性</label>
-                  <input
-                    type="text"
-                    value={formData.pos}
-                    onChange={(e) => setFormData({ ...formData, pos: e.target.value })}
-                    placeholder="v. / n. / adj."
-                    className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-cozyDark-200 mb-1">多益目標級別</label>
-                  <select
-                    value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300 bg-white"
-                  >
-                    <option value="L1">L1 (500+ 核心)</option>
-                    <option value="L2">L2 (650+ 進階)</option>
-                    <option value="L3">L3 (775+ 衝刺)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-cozyDark-200 mb-1">商務分類</label>
-                  <input
-                    type="text"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="人事/合約/行銷"
-                    className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300"
-                  />
-                </div>
-              </div>
+              {/* Action Button */}
+              <button
+                type="submit"
+                disabled={isLoading || !wordInput.trim()}
+                className="w-full py-4 sm:py-4.5 bg-latte-600 hover:bg-latte-700 text-white font-black text-sm sm:text-base rounded-2xl shadow-sm transition active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>AI 自動解析與補全中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 text-amberGold-300" />
+                    <span>一鍵智能補全並加入自習室 (Enter)</span>
+                  </>
+                )}
+              </button>
 
-              {/* Simple English Definition */}
-              <div>
-                <label className="block text-xs font-bold text-latte-700 mb-1">
-                  Simple English Definition (英英核心定義)
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.simpleDefinition}
-                  onChange={(e) => setFormData({ ...formData, simpleDefinition: e.target.value })}
-                  placeholder="用簡單英文理解單字..."
-                  className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300 focus:outline-none focus:ring-1 focus:ring-latte-400"
-                />
-              </div>
-
-              {/* Collocation */}
-              <div>
-                <label className="block text-xs font-bold text-amberGold-600 mb-1">
-                  TOEIC Collocation (常考搭配詞)
-                </label>
-                <input
-                  type="text"
-                  value={formData.collocation}
-                  onChange={(e) => setFormData({ ...formData, collocation: e.target.value })}
-                  placeholder="例: negotiate contract terms"
-                  className="w-full px-3 py-2 rounded-xl border border-amberGold-200 bg-amberGold-50/50 text-xs text-latte-800"
-                />
-              </div>
-
-              {/* Business Example */}
-              <div>
-                <label className="block text-xs font-semibold text-cozyDark-200 mb-1">
-                  商務情境例句 (Business Example)
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.example}
-                  onChange={(e) => setFormData({ ...formData, example: e.target.value })}
-                  placeholder="例句..."
-                  className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300"
-                />
-              </div>
-
-              {/* Chinese Definition */}
-              <div>
-                <label className="block text-xs font-bold text-latte-700 mb-1">
-                  繁體中文考點釋義 (按需展開內容)
-                </label>
-                <input
-                  type="text"
-                  value={formData.chinese}
-                  onChange={(e) => setFormData({ ...formData, chinese: e.target.value })}
-                  placeholder="中文意思..."
-                  className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-latte-800 font-medium"
-                />
-              </div>
-
-              <div className="pt-2">
+              {/* Optional Collapsible Advanced Details */}
+              <div className="pt-2 border-t border-cream-200">
                 <button
-                  type="submit"
-                  className="w-full py-3 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm rounded-2xl shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-xs font-bold text-cozyDark-200 hover:text-latte-700 flex items-center gap-1 transition"
                 >
-                  <Check className="w-4 h-4" /> 儲存至生詞本
+                  {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  <span>{showAdvanced ? '收合進階自訂欄位' : '⚙️ 想手動微調特定欄位？點此展開（選填）'}</span>
                 </button>
+
+                {showAdvanced && (
+                  <div className="mt-3 p-4 bg-cream-50 rounded-2xl border border-cream-300 space-y-3 animate-fade-in text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-cozyDark-300">多益等級</label>
+                        <select
+                          value={advancedData.level}
+                          onChange={(e) => setAdvancedData({ ...advancedData, level: e.target.value })}
+                          className="w-full p-2 mt-1 rounded-xl border border-cream-300 bg-white"
+                        >
+                          <option value="L1">L1 (500+)</option>
+                          <option value="L2">L2 (650+)</option>
+                          <option value="L3">L3 (775+)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-cozyDark-300">自訂中文</label>
+                        <input
+                          type="text"
+                          placeholder="留空則自動翻譯..."
+                          value={advancedData.chinese}
+                          onChange={(e) => setAdvancedData({ ...advancedData, chinese: e.target.value })}
+                          className="w-full p-2 mt-1 rounded-xl border border-cream-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSaveBatch} className="space-y-4">
+            <form onSubmit={handleBatchAdd} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-latte-700 uppercase mb-1">
-                  貼上單字清單（一行一個單字）
+                <label className="block text-xs sm:text-sm font-black text-latte-800 mb-2">
+                  📋 貼上一串單字（可用換行或逗號隔開）
                 </label>
                 <textarea
                   rows={6}
                   required
-                  placeholder={"comply\naccommodate\nreimburse\nexpedite\nnegotiate..."}
+                  disabled={isLoading}
+                  placeholder={"comply\naccommodate\nreimburse\nexpedite\nnegotiate\nmandatory..."}
                   value={batchText}
                   onChange={(e) => setBatchText(e.target.value)}
-                  className="w-full p-4 rounded-2xl border border-cream-300 text-sm font-mono text-cozyDark-400 focus:outline-none focus:ring-2 focus:ring-latte-400"
+                  className="w-full p-4 rounded-2xl border-2 border-cream-300 text-sm sm:text-base font-mono text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400 shadow-inner"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-cozyDark-200 mb-1">批次設定級別</label>
-                  <select
-                    value={batchLevel}
-                    onChange={(e) => setBatchLevel(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs bg-white text-cozyDark-300"
-                  >
-                    <option value="L1">L1 (500+ 核心)</option>
-                    <option value="L2">L2 (650+ 進階)</option>
-                    <option value="L3">L3 (775+ 衝刺)</option>
-                  </select>
+              {batchProgress && (
+                <div className="p-3 bg-amberGold-50 border border-amberGold-200 rounded-xl text-xs font-bold text-amberGold-700 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{batchProgress}</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-cozyDark-200 mb-1">標籤分類</label>
-                  <input
-                    type="text"
-                    value={batchCategory}
-                    onChange={(e) => setBatchCategory(e.target.value)}
-                    placeholder="例如: 模擬考錯題"
-                    className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs text-cozyDark-300"
-                  />
-                </div>
-              </div>
+              )}
 
               <button
                 type="submit"
                 disabled={isLoading || !batchText.trim()}
-                className="w-full py-3 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm rounded-2xl shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-4 bg-latte-600 hover:bg-latte-700 text-white font-black text-sm sm:text-base rounded-2xl shadow-sm transition active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
-                一鍵批次匯入
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>批次解析與匯入中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-5 h-5 text-amberGold-300" />
+                    <span>🚀 一鍵全部智能補全並存入</span>
+                  </>
+                )}
               </button>
             </form>
           )}
