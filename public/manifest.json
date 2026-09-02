@@ -1,0 +1,23 @@
+{
+  "name": "Cozy TOEIC 暖心多益英英自習室",
+  "short_name": "CozyTOEIC",
+  "description": "專為多益 350→775 分設計的英英沉浸式單字學習系統",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#8C5E3C",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C5E3C'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='60'>🌱</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238C5E3C'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='60'>🌱</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
