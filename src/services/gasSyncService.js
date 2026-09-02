@@ -2,6 +2,7 @@
  * Google Apps Script (GAS) Sync Client Service
  */
 
+const GAS_URL_KEY = 'cozy_toeic_gas_url';
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby_qeCnxjUnhdhuNSznujknjugUXUjPOrBpViHk5gB8PpAJgnekokO_YJs4ui82rqnOHg/exec';
 
 export function getSavedGasUrl() {
