@@ -99,8 +99,8 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
 
   if (!words || words.length < 4) {
     return (
-      <div className="bg-white rounded-3xl p-8 text-center max-w-md mx-auto paper-shadow border border-cream-300">
-        <p className="text-sm font-semibold text-latte-700">
+      <div className="bg-white rounded-3xl p-10 text-center max-w-xl mx-auto paper-shadow border border-cream-300">
+        <p className="text-base font-bold text-latte-700">
           單字庫單字數量不足（至少需 4 個單字），請先新增或匯入單字！
         </p>
       </div>
@@ -109,45 +109,45 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
 
   if (isFinished) {
     return (
-      <div className="bg-white rounded-3xl p-8 text-center max-w-md mx-auto paper-shadow border border-cream-300 space-y-5 animate-fade-in">
-        <div className="w-16 h-16 bg-amberGold-100 rounded-full flex items-center justify-center mx-auto text-3xl">
+      <div className="bg-white rounded-3xl p-10 sm:p-14 text-center max-w-xl mx-auto paper-shadow border border-cream-300 space-y-6 animate-fade-in">
+        <div className="w-20 h-20 bg-amberGold-100 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
           🏆
         </div>
-        <h2 className="text-xl font-bold text-latte-800">測驗挑戰完成！</h2>
+        <h2 className="text-2xl sm:text-3xl font-black text-latte-800">測驗挑戰完成！</h2>
         
-        <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200">
-          <div className="text-xs text-cozyDark-200">本次測驗得分</div>
-          <div className="text-3xl font-bold text-latte-700 mt-1">
+        <div className="p-6 bg-cream-50 rounded-3xl border border-cream-200 space-y-1">
+          <div className="text-xs sm:text-sm font-semibold text-cozyDark-200">本次測驗得分</div>
+          <div className="text-4xl sm:text-5xl font-black text-latte-800">
             {score} / {quizList.length}
           </div>
-          <div className="text-xs text-sage-600 font-semibold mt-1">
+          <div className="text-sm font-bold text-sage-600 pt-1">
             正確率：{Math.round((score / quizList.length) * 100)}%
           </div>
         </div>
 
         <button
           onClick={startNewQuiz}
-          className="w-full py-3 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
+          className="w-full py-4 bg-latte-600 hover:bg-latte-700 text-white font-bold text-base rounded-2xl shadow-sm transition flex items-center justify-center gap-2 active:scale-98"
         >
-          <RotateCcw className="w-4 h-4" /> 再測驗一回
+          <RotateCcw className="w-5 h-5" /> 再測驗一回
         </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto space-y-6">
       {/* Top Header: Progress & Mode Switch */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-cream-300 paper-shadow">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-latte-700">
-          <Award className="w-4 h-4 text-amberGold-500" />
-          <span>題數：{currentIndex + 1} / {quizList.length}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-3xl border border-cream-300 paper-shadow">
+        <div className="flex items-center gap-2 text-sm sm:text-base font-black text-latte-800">
+          <Award className="w-5 h-5 text-amberGold-500" />
+          <span>進度：{currentIndex + 1} / {quizList.length}</span>
         </div>
 
-        <div className="flex bg-cream-100 p-1 rounded-xl text-xs font-semibold text-cozyDark-200">
+        <div className="flex bg-cream-100 p-1.5 rounded-2xl text-xs sm:text-sm font-bold text-cozyDark-200">
           <button
             onClick={() => { setQuizType('choice'); setIsAnswered(false); }}
-            className={`px-3 py-1 rounded-lg transition ${
+            className={`px-3.5 sm:px-4 py-1.5 rounded-xl transition ${
               quizType === 'choice' ? 'bg-white text-latte-800 shadow-sm' : 'hover:text-latte-600'
             }`}
           >
@@ -155,7 +155,7 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
           </button>
           <button
             onClick={() => { setQuizType('dictation'); setIsAnswered(false); }}
-            className={`px-3 py-1 rounded-lg transition ${
+            className={`px-3.5 sm:px-4 py-1.5 rounded-xl transition ${
               quizType === 'dictation' ? 'bg-white text-latte-800 shadow-sm' : 'hover:text-latte-600'
             }`}
           >
@@ -166,45 +166,45 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
 
       {/* Main Question Card */}
       {currentWord && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 paper-shadow border border-cream-300 space-y-6">
+        <div className="bg-white rounded-3xl p-6 sm:p-10 lg:p-12 paper-shadow border border-cream-300 space-y-6 sm:space-y-8">
           {quizType === 'choice' ? (
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-latte-500 uppercase tracking-wider">
-                  Question: Target Concept
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs sm:text-sm font-extrabold text-latte-500 uppercase tracking-wider">
+                  Target Concept & Context
                 </span>
                 <button
                   onClick={() => speakText(currentWord.word)}
-                  className="text-xs font-semibold text-latte-600 flex items-center gap-1 hover:underline"
+                  className="text-xs sm:text-sm font-bold text-latte-600 flex items-center gap-1.5 hover:underline px-2.5 py-1 rounded-xl hover:bg-cream-100"
                 >
-                  <Volume2 className="w-4 h-4" /> 聽目標單字發音
+                  <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-latte-500" /> 聽單字發音
                 </button>
               </div>
 
               {/* Collocation Clue */}
-              <div className="p-4 bg-amberGold-50/60 rounded-2xl border border-amberGold-200/80 mb-3">
-                <div className="text-xs font-bold text-amberGold-600 mb-1 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" /> 多益常考搭配語境 (Collocation)：
+              <div className="p-5 sm:p-7 bg-amberGold-50/70 rounded-3xl border border-amberGold-200 mb-4">
+                <div className="text-xs sm:text-sm font-black text-amberGold-700 mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-600" /> 多益常考搭配語境 (Collocation)：
                 </div>
-                <div className="text-base font-bold text-latte-800">
-                  {currentWord.collocation.replace(new RegExp(currentWord.word, 'gi'), '_____')}
+                <div className="text-lg sm:text-2xl font-black text-latte-800 leading-relaxed">
+                  {currentWord.collocation.replace(new RegExp(currentWord.word, 'gi'), '_______')}
                 </div>
               </div>
 
               {/* English Definition */}
-              <div className="p-3 bg-cream-50 rounded-xl border border-cream-200 text-xs text-cozyDark-300">
+              <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-sm sm:text-base text-cozyDark-300">
                 <strong className="text-latte-700">Simple English:</strong> "{currentWord.simpleDefinition}"
               </div>
 
               {/* 4 Choices */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
                 {choices.map((choice) => {
-                  let btnClass = 'bg-cream-50 hover:bg-cream-100 border-cream-300 text-latte-800';
+                  let btnClass = 'bg-cream-50 hover:bg-cream-100 border-2 border-cream-300 text-latte-800';
                   if (isAnswered) {
                     if (choice.id === currentWord.id) {
-                      btnClass = 'bg-sage-100 border-sage-400 text-sage-800 font-bold';
+                      btnClass = 'bg-sage-100 border-2 border-sage-500 text-sage-800 font-black';
                     } else if (selectedOption?.id === choice.id) {
-                      btnClass = 'bg-terracotta-100 border-terracotta-400 text-terracotta-800';
+                      btnClass = 'bg-terracotta-100 border-2 border-terracotta-400 text-terracotta-800';
                     } else {
                       btnClass = 'opacity-40 border-cream-200';
                     }
@@ -215,14 +215,14 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                       key={choice.id}
                       onClick={() => handleSelectChoice(choice)}
                       disabled={isAnswered}
-                      className={`p-4 rounded-2xl border text-sm font-semibold transition text-left flex items-center justify-between ${btnClass}`}
+                      className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl text-base sm:text-lg font-bold transition text-left flex items-center justify-between shadow-xs ${btnClass}`}
                     >
                       <span>{choice.word}</span>
                       {isAnswered && choice.id === currentWord.id && (
-                        <CheckCircle2 className="w-4 h-4 text-sage-600 flex-shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-sage-600 flex-shrink-0" />
                       )}
                       {isAnswered && selectedOption?.id === choice.id && choice.id !== currentWord.id && (
-                        <XCircle className="w-4 h-4 text-terracotta-600 flex-shrink-0" />
+                        <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-terracotta-600 flex-shrink-0" />
                       )}
                     </button>
                   );
@@ -231,22 +231,22 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
             </div>
           ) : (
             /* Dictation Mode */
-            <form onSubmit={handleCheckDictation} className="space-y-4">
-              <div className="text-center py-4">
+            <form onSubmit={handleCheckDictation} className="space-y-6">
+              <div className="text-center py-4 sm:py-6">
                 <button
                   type="button"
                   onClick={() => speakText(currentWord.word)}
-                  className="w-16 h-16 bg-latte-100 hover:bg-latte-200 text-latte-700 rounded-full flex items-center justify-center mx-auto shadow-sm transition active:scale-95"
+                  className="w-20 h-20 sm:w-24 sm:h-24 bg-latte-100 hover:bg-latte-200 text-latte-700 rounded-full flex items-center justify-center mx-auto shadow-sm transition active:scale-95"
                   title="點擊聽發音"
                 >
-                  <Volume2 className="w-7 h-7" />
+                  <Volume2 className="w-9 h-9 sm:w-11 sm:h-11" />
                 </button>
-                <p className="text-xs text-cozyDark-200 mt-2">
+                <p className="text-xs sm:text-sm text-cozyDark-200 mt-3 font-semibold">
                   點擊按鈕聆聽單字發音，並在下方輸入正確拼寫
                 </p>
               </div>
 
-              <div className="p-3 bg-cream-50 rounded-xl border border-cream-200 text-xs text-cozyDark-300 text-center">
+              <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-xs sm:text-base text-cozyDark-300 text-center">
                 <strong>英英提示：</strong> "{currentWord.simpleDefinition}"
               </div>
 
@@ -257,22 +257,22 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 placeholder="輸入單字拼寫..."
-                className="w-full text-center px-4 py-3 rounded-2xl border border-cream-300 text-base font-bold text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400 font-mono"
+                className="w-full text-center px-5 py-4 sm:py-5 rounded-2xl sm:rounded-3xl border-2 border-cream-300 text-lg sm:text-2xl font-black text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400 font-mono shadow-inner"
               />
 
               {!isAnswered ? (
                 <button
                   type="submit"
                   disabled={!userInput.trim()}
-                  className="w-full py-3 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm rounded-2xl shadow-sm transition disabled:opacity-50"
+                  className="w-full py-4 sm:py-5 bg-latte-600 hover:bg-latte-700 text-white font-black text-base sm:text-lg rounded-2xl sm:rounded-3xl shadow-sm transition disabled:opacity-50"
                 >
                   確認答案
                 </button>
               ) : (
-                <div className={`p-4 rounded-2xl text-center text-sm font-bold border ${
+                <div className={`p-5 rounded-2xl sm:rounded-3xl text-center text-base sm:text-xl font-black border-2 ${
                   userInput.trim().toLowerCase() === currentWord.word.toLowerCase()
-                    ? 'bg-sage-100 border-sage-300 text-sage-700'
-                    : 'bg-terracotta-100 border-terracotta-300 text-terracotta-700'
+                    ? 'bg-sage-100 border-sage-300 text-sage-800'
+                    : 'bg-terracotta-100 border-terracotta-300 text-terracotta-800'
                 }`}>
                   {userInput.trim().toLowerCase() === currentWord.word.toLowerCase()
                     ? '🎉 拼寫完全正確！'
@@ -287,10 +287,10 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
             <div className="pt-2">
               <button
                 onClick={handleNext}
-                className="w-full py-3.5 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm rounded-2xl shadow-sm transition flex items-center justify-center gap-2 active:scale-[0.98]"
+                className="w-full py-4 sm:py-5 bg-latte-600 hover:bg-latte-700 text-white font-black text-base sm:text-lg rounded-2xl sm:rounded-3xl shadow-sm transition flex items-center justify-center gap-2 active:scale-98"
               >
                 <span>下一題</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
           )}

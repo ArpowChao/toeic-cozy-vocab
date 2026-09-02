@@ -85,18 +85,8 @@ export default function App() {
     setWords((prev) => prev.filter((w) => w.id !== deletedId));
   };
 
-  // Force reset word state to 'new' for extra practice
-  const handleExtraPractice = async () => {
-    const resetList = words.map((w) => ({
-      ...w,
-      dueDate: new Date().toISOString().split('T')[0],
-    }));
-    setWords(resetList);
-    setActiveTab('study');
-  };
-
   return (
-    <div className="min-h-screen bg-cream-100 flex flex-col font-sans pb-20 sm:pb-10">
+    <div className="min-h-screen bg-cream-100 flex flex-col font-sans pb-24 sm:pb-12">
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -107,18 +97,18 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="flex-1 max-w-5xl lg:max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 sm:py-10">
         {/* Tab 1: Study & Immersion Flashcard */}
         {activeTab === 'study' && (
-          <div className="space-y-6">
+          <div className="space-y-6 sm:space-y-8">
             {/* Top Compact Progress Bar */}
-            <div className="max-w-xl mx-auto flex items-center justify-between text-xs font-bold text-latte-700 bg-white/80 p-3.5 rounded-2xl border border-cream-300 paper-shadow">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amberGold-500 animate-ping" />
-                <span>今日待複習：<strong className="text-latte-800">{dueWords.length}</strong> 個</span>
+            <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm font-bold text-latte-700 bg-white/90 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-cream-300 paper-shadow">
+              <div className="flex items-center gap-2.5">
+                <span className="w-3 h-3 rounded-full bg-amberGold-500 animate-ping" />
+                <span>今日待複習：<strong className="text-latte-900 text-sm sm:text-base">{dueWords.length}</strong> 個</span>
               </div>
-              <div className="flex items-center gap-1.5 text-latte-600">
-                <Flame className="w-4 h-4 text-amberGold-500" />
+              <div className="flex items-center gap-2 text-latte-700 font-bold">
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-500" />
                 <span>今日已完成：{todayCompletedCount} 字</span>
               </div>
             </div>
@@ -133,37 +123,37 @@ export default function App() {
               </div>
             ) : (
               /* All Completed Celebration View */
-              <div className="bg-white rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto paper-shadow border border-cream-300 space-y-6 animate-fade-in">
-                <div className="w-20 h-20 bg-amberGold-100 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
+              <div className="bg-white rounded-3xl p-8 sm:p-14 text-center max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto paper-shadow border border-cream-300 space-y-6 sm:space-y-8 animate-fade-in">
+                <div className="w-24 h-24 bg-amberGold-100 rounded-full flex items-center justify-center mx-auto text-5xl shadow-inner">
                   ☕
                 </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold text-latte-800 tracking-tight">
+                <div className="space-y-3">
+                  <h2 className="text-2xl sm:text-3xl font-black text-latte-800 tracking-tight">
                     太棒了！今日複習任務全部完成
                   </h2>
-                  <p className="text-sm text-cozyDark-200 max-w-md mx-auto leading-relaxed">
+                  <p className="text-sm sm:text-base text-cozyDark-200 max-w-lg mx-auto leading-relaxed">
                     休息一下喝杯咖啡，讓大腦鞏固英英記憶。小植物今天也喝得飽飽的，朝 775 藍證更靠近一步！
                   </p>
                 </div>
 
                 {/* Score badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-cream-100 border border-cream-200 text-xs font-bold text-latte-700">
+                <div className="inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-cream-100 border border-cream-300 text-sm font-bold text-latte-700 shadow-xs">
                   <span>當前多益預估分數：</span>
-                  <span className="text-base text-latte-800">{stats.predictedScore} 分</span>
+                  <span className="text-xl sm:text-2xl font-black text-latte-900">{stats.predictedScore} 分</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 max-w-md mx-auto">
                   <button
                     onClick={() => setActiveTab('quiz')}
-                    className="py-3 px-4 bg-latte-600 hover:bg-latte-700 text-white font-bold text-xs rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5"
+                    className="py-4 px-6 bg-latte-600 hover:bg-latte-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
                   >
-                    <Sparkles className="w-4 h-4" /> 進行實戰測驗
+                    <Sparkles className="w-5 h-5" /> 進行實戰測驗
                   </button>
                   <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="py-3 px-4 bg-white hover:bg-cream-200 border border-cream-300 text-latte-700 font-bold text-xs rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5"
+                    className="py-4 px-6 bg-white hover:bg-cream-200 border border-cream-300 text-latte-700 font-bold text-sm sm:text-base rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> 新增生詞筆記
+                    <Plus className="w-5 h-5" /> 新增生詞筆記
                   </button>
                 </div>
               </div>
@@ -192,7 +182,7 @@ export default function App() {
 
         {/* Tab 4: Garden & Analytics */}
         {activeTab === 'garden' && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <PlantGrowth
               stats={stats}
               todayCompletedCount={todayCompletedCount}

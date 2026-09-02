@@ -16,7 +16,11 @@ export default function WordList({ words = [], onWordDeleted }) {
       (w.collocation && w.collocation.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesLevel = selectedLevel === 'ALL' || w.level === selectedLevel;
-    const matchesState = selectedState === 'ALL' || (selectedState === 'due' ? w.dueDate <= new Date().toISOString().split('T')[0] : w.state === selectedState);
+    const matchesState =
+      selectedState === 'ALL' ||
+      (selectedState === 'due'
+        ? w.dueDate <= new Date().toISOString().split('T')[0]
+        : w.state === selectedState);
 
     return matchesSearch && matchesLevel && matchesState;
   });
@@ -29,40 +33,45 @@ export default function WordList({ words = [], onWordDeleted }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-5xl lg:max-w-6xl mx-auto space-y-6">
       {/* Search & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-cream-300 paper-shadow space-y-3">
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-cream-300 paper-shadow space-y-4">
         <div className="relative">
-          <Search className="w-4 h-4 text-cozyDark-100 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-5 h-5 text-cozyDark-200 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="搜尋單字、搭配詞或中文..."
+            placeholder="搜尋單字、搭配詞或中文釋義..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-cream-300 text-xs font-semibold text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400"
+            className="w-full pl-12 pr-4 py-3 sm:py-3.5 rounded-2xl border border-cream-300 text-sm sm:text-base font-semibold text-latte-800 focus:outline-none focus:ring-2 focus:ring-latte-400 shadow-xs"
           />
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
           {/* Level Filter */}
-          <div className="flex items-center gap-1 bg-cream-100 p-1 rounded-xl">
-            {['ALL', 'L1', 'L2', 'L3'].map((lvl) => (
+          <div className="flex items-center gap-1.5 bg-cream-100 p-1.5 rounded-2xl border border-cream-200">
+            {[
+              { id: 'ALL', label: '全部級別' },
+              { id: 'L1', label: 'L1 (500+)' },
+              { id: 'L2', label: 'L2 (650+)' },
+              { id: 'L3', label: 'L3 (775+)' },
+            ].map((lvl) => (
               <button
-                key={lvl}
-                onClick={() => setSelectedLevel(lvl)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
-                  selectedLevel === lvl
-                    ? 'bg-latte-500 text-white shadow-sm'
-                    : 'text-cozyDark-200 hover:text-latte-700'
+                key={lvl.id}
+                onClick={() => setSelectedLevel(lvl.id)}
+                className={`px-3 sm:px-4 py-1.5 rounded-xl font-bold transition ${
+                  selectedLevel === lvl.id
+                    ? 'bg-latte-600 text-white shadow-xs'
+                    : 'text-cozyDark-200 hover:text-latte-800'
                 }`}
               >
-                {lvl === 'ALL' ? '全部級別' : lvl}
+                {lvl.label}
               </button>
             ))}
           </div>
 
           {/* State Filter */}
-          <div className="flex items-center gap-1 bg-cream-100 p-1 rounded-xl">
+          <div className="flex items-center gap-1.5 bg-cream-100 p-1.5 rounded-2xl border border-cream-200">
             {[
               { id: 'ALL', label: '全部狀態' },
               { id: 'new', label: '新單字' },
@@ -72,10 +81,10 @@ export default function WordList({ words = [], onWordDeleted }) {
               <button
                 key={st.id}
                 onClick={() => setSelectedState(st.id)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                className={`px-3 sm:px-4 py-1.5 rounded-xl font-bold transition ${
                   selectedState === st.id
-                    ? 'bg-latte-500 text-white shadow-sm'
-                    : 'text-cozyDark-200 hover:text-latte-700'
+                    ? 'bg-latte-600 text-white shadow-xs'
+                    : 'text-cozyDark-200 hover:text-latte-800'
                 }`}
               >
                 {st.label}
@@ -86,73 +95,76 @@ export default function WordList({ words = [], onWordDeleted }) {
       </div>
 
       {/* Word Count */}
-      <div className="flex justify-between items-center px-2 text-xs text-cozyDark-100 font-semibold">
+      <div className="flex justify-between items-center px-2 text-xs sm:text-sm text-cozyDark-200 font-bold">
         <span>顯示 {filteredWords.length} 個單字 (共 {words.length} 個)</span>
       </div>
 
-      {/* Words List */}
-      <div className="space-y-3">
+      {/* Words Responsive Grid List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {filteredWords.map((item) => {
           const isExpanded = expandedWordId === item.id;
           return (
             <div
               key={item.id}
-              className="bg-white rounded-2xl p-4 border border-cream-300/90 paper-shadow hover:border-latte-300 transition"
+              className="bg-white rounded-3xl p-5 sm:p-6 border border-cream-300 paper-shadow hover:border-latte-300 transition flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-bold text-latte-800">{item.word}</span>
-                    <span className="text-xs font-mono text-cozyDark-100">{item.ipa}</span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-cream-200 text-latte-700">
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-xl sm:text-2xl font-black text-latte-800 tracking-tight">
+                      {item.word}
+                    </span>
+                    <span className="text-xs sm:text-sm font-mono text-cozyDark-200">{item.ipa}</span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-cream-200 text-latte-700">
                       {item.pos}
                     </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-latte-100 text-latte-600 font-semibold">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-latte-100 text-latte-700 font-bold border border-latte-200">
                       {item.level || 'L2'}
                     </span>
                   </div>
 
-                  <p className="text-xs text-cozyDark-300 mt-1 line-clamp-2">
-                    "{item.simpleDefinition}"
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => speakText(item.word)}
+                      className="p-2 sm:p-2.5 rounded-xl text-latte-600 hover:bg-latte-100 transition"
+                      title="播放發音"
+                    >
+                      <Volume2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setExpandedWordId(isExpanded ? null : item.id)}
+                      className="p-2 sm:p-2.5 rounded-xl text-latte-600 hover:bg-latte-100 transition"
+                      title="展開/收合考點詳情"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id, item.word)}
+                      className="p-2 sm:p-2.5 rounded-xl text-terracotta-400 hover:text-terracotta-600 hover:bg-terracotta-50 transition"
+                      title="刪除單字"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-cozyDark-300 mt-2 line-clamp-2 leading-relaxed">
+                  "{item.simpleDefinition}"
+                </p>
+
+                {item.collocation && (
+                  <p className="text-xs sm:text-sm font-bold text-amberGold-700 mt-2 bg-amberGold-50/70 p-2.5 rounded-xl border border-amberGold-200/60">
+                    🔗 {item.collocation}
                   </p>
-
-                  {item.collocation && (
-                    <p className="text-xs font-semibold text-amberGold-600 mt-1">
-                      🔗 {item.collocation}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => speakText(item.word)}
-                    className="p-2 rounded-xl text-latte-600 hover:bg-latte-100 transition"
-                    title="播放發音"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setExpandedWordId(isExpanded ? null : item.id)}
-                    className="p-2 rounded-xl text-latte-600 hover:bg-latte-100 transition"
-                    title="展開/收合考點詳情"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id, item.word)}
-                    className="p-2 rounded-xl text-terracotta-400 hover:text-terracotta-600 hover:bg-terracotta-50 transition"
-                    title="刪除單字"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                )}
               </div>
 
               {/* Expanded Detail View */}
               {isExpanded && (
-                <div className="mt-3 pt-3 border-t border-cream-200 text-xs space-y-2 animate-fade-in bg-cream-50 p-3 rounded-xl">
+                <div className="mt-4 pt-4 border-t border-cream-200 text-xs sm:text-sm space-y-2.5 animate-fade-in bg-cream-50 p-4 rounded-2xl">
                   <div>
-                    <span className="font-bold text-latte-700">繁中釋義：</span> {item.chinese}
+                    <span className="font-bold text-latte-700">繁中釋義：</span>
+                    <strong className="text-latte-800 text-sm sm:text-base ml-1">{item.chinese}</strong>
                   </div>
                   {item.example && (
                     <div>
@@ -160,19 +172,19 @@ export default function WordList({ words = [], onWordDeleted }) {
                     </div>
                   )}
                   {item.exampleZh && (
-                    <div className="text-cozyDark-200">
+                    <div className="text-cozyDark-300">
                       <span className="font-bold text-latte-700">例句翻譯：</span> {item.exampleZh}
                     </div>
                   )}
                   {item.toeicTip && (
-                    <div className="text-amberGold-700">
-                      <span className="font-bold">多益重點：</span> {item.toeicTip}
+                    <div className="text-amberGold-800 bg-white p-2.5 rounded-xl border border-amberGold-200/80">
+                      💡 <span className="font-bold">多益考點：</span> {item.toeicTip}
                     </div>
                   )}
-                  <div className="flex gap-4 text-[10px] text-cozyDark-100 pt-1 font-mono">
+                  <div className="flex gap-4 text-xs text-cozyDark-200 pt-1 font-mono">
                     <span>複習次數: {item.repetition || 0}</span>
-                    <span>間隔天數: {item.interval || 0}天</span>
-                    <span>下次複習日: {item.dueDate || '尚未排程'}</span>
+                    <span>間隔: {item.interval || 0}天</span>
+                    <span>到期日: {item.dueDate || '尚未排程'}</span>
                   </div>
                 </div>
               )}
@@ -181,7 +193,7 @@ export default function WordList({ words = [], onWordDeleted }) {
         })}
 
         {filteredWords.length === 0 && (
-          <div className="bg-white rounded-2xl p-8 text-center border border-cream-300 text-xs text-cozyDark-100">
+          <div className="col-span-full bg-white rounded-3xl p-12 text-center border border-cream-300 text-sm text-cozyDark-200">
             查無相符單字，請嘗試切換篩選條件或點擊右上角新增單字！
           </div>
         )}
