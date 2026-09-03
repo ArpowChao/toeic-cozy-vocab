@@ -1,8 +1,70 @@
 import React, { useState } from 'react';
 import { X, Cloud, CloudUpload, CloudDownload, Download, Upload, RotateCcw, Volume2, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
-import { getSavedGasUrl, saveGasUrl, testGasConnection, pushWordsToGas, pullWordsFromGas } from '../services/gasSyncService.js';
-import { exportToJSON, saveWordsBatch, resetToDefault } from '../services/storageService.js';
+import { getSavedGasUrl, saveGasUrl, testGasConnection, pushWordsToGas, pullWordsFromGas, mergeWordLists } from '../services/gasSyncService.js';
+import { exportToJSON, getAllWords, saveWordsBatch, resetToDefault } from '../services/storageService.js';
 import { setTTSConfig } from '../services/ttsService.js';
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length <= 1) return [];
+
+  const parseLine = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseLine(lines[0]).map((h) => h.trim().replace(/^"|"$/g, ''));
+  const words = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = values[idx] !== undefined ? values[idx] : '';
+    });
+    if (obj.word) {
+      words.push({
+        id: obj.id || `csv-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+        word: obj.word.trim(),
+        ipa: obj.ipa || '',
+        pos: obj.pos || '',
+        level: obj.level || 'L2',
+        category: obj.category || '自訂生詞',
+        simpleDefinition: obj.simpleDefinition || '',
+        collocation: obj.collocation || '',
+        example: obj.example || '',
+        exampleZh: obj.exampleZh || '',
+        chinese: obj.chinese || '',
+        toeicTip: obj.toeicTip || '',
+        state: obj.state || 'new',
+        repetition: Number(obj.repetition) || 0,
+        interval: Number(obj.interval) || 0,
+        easeFactor: Number(obj.easeFactor) || 2.5,
+        dueDate: obj.dueDate || null,
+        lastReviewed: obj.lastReviewed || null,
+      });
+    }
+  }
+  return words;
+}
 
 export default function SettingsModal({ isOpen, onClose, words, onReloadWords }) {
   const [gasUrl, setGasUrl] = useState(getSavedGasUrl());
@@ -50,14 +112,16 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
   };
 
   const handlePull = async () => {
-    if (!confirm('從 Google 試算表同步將會覆蓋或合併現有本地單字，是否確定？')) return;
+    if (!confirm('從 Google 試算表同步將會更新本地單字與釋義，是否確定？')) return;
     setIsLoading(true);
     try {
       saveGasUrl(gasUrl);
       const pulledWords = await pullWordsFromGas(gasUrl);
       if (pulledWords.length > 0) {
-        await saveWordsBatch(pulledWords);
-        onReloadWords();
+        const localWords = await getAllWords();
+        const merged = mergeWordLists(localWords, pulledWords);
+        await saveWordsBatch(merged);
+        await onReloadWords();
         showStatus('success', `成功從 Google 試算表同步 ${pulledWords.length} 個單字！`);
       } else {
         showStatus('error', '試算表內目前無單字資料。');
@@ -69,32 +133,55 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
     }
   };
 
-  const handleJsonImport = (e) => {
+  const handleFileImport = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const fileName = file.name.toLowerCase();
     const reader = new FileReader();
+
     reader.onload = async (event) => {
       try {
-        const json = JSON.parse(event.target?.result);
-        if (json.words && Array.isArray(json.words)) {
-          await saveWordsBatch(json.words);
-          onReloadWords();
-          showStatus('success', `成功從備份檔案匯入 ${json.words.length} 個單字！`);
+        const content = event.target?.result;
+        let importedWords = [];
+
+        if (fileName.endsWith('.json')) {
+          const json = JSON.parse(content);
+          if (json.words && Array.isArray(json.words)) {
+            importedWords = json.words;
+          } else {
+            showStatus('error', 'JSON 檔案格式不符，未找到 words 欄位。');
+            return;
+          }
+        } else if (fileName.endsWith('.csv')) {
+          importedWords = parseCSV(content);
+          if (importedWords.length === 0) {
+            showStatus('error', 'CSV 檔案解析失敗或無有效單字資料。');
+            return;
+          }
         } else {
-          showStatus('error', '檔案格式不符，未找到 words 欄位。');
+          showStatus('error', '僅支援 .json 或 .csv 檔案格式。');
+          return;
         }
-      } catch {
-        showStatus('error', '無法解析 JSON 檔案。');
+
+        const localWords = await getAllWords();
+        const merged = mergeWordLists(localWords, importedWords);
+        await saveWordsBatch(merged);
+        await onReloadWords();
+        showStatus('success', `成功匯入並更新 ${importedWords.length} 個單字！`);
+      } catch (err) {
+        showStatus('error', `檔案解析錯誤: ${err.message}`);
       }
     };
+
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleReset = async () => {
     if (confirm('確定要重置為預設多益高頻單字庫嗎？所有個人自訂進度將被重置。')) {
       await resetToDefault();
-      onReloadWords();
+      await onReloadWords();
       showStatus('success', '已成功重置為預設多益單字庫！');
     }
   };
@@ -231,9 +318,9 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
             </div>
           </div>
 
-          {/* Section 3: JSON File Backup & Reset */}
+          {/* Section 3: File Backup & Reset */}
           <div className="p-4 rounded-2xl bg-cream-50 border border-cream-300 space-y-3">
-            <h3 className="text-sm font-bold text-latte-800">本機備份與重置</h3>
+            <h3 className="text-sm font-bold text-latte-800">本機備份與匯入 / 重置</h3>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={exportToJSON}
@@ -243,8 +330,8 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
               </button>
 
               <label className="py-2.5 px-3 bg-white hover:bg-cream-200 border border-cream-300 rounded-xl text-xs font-semibold text-latte-700 flex items-center justify-center gap-1.5 transition cursor-pointer text-center">
-                <Upload className="w-4 h-4" /> 匯入 JSON 備份
-                <input type="file" accept=".json" onChange={handleJsonImport} className="hidden" />
+                <Upload className="w-4 h-4" /> 匯入 JSON / CSV (Excel)
+                <input type="file" accept=".json,.csv" onChange={handleFileImport} className="hidden" />
               </label>
             </div>
 

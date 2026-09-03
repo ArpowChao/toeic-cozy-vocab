@@ -68,14 +68,26 @@ export async function pullWordsFromGas(url) {
   if (!res.ok) throw new Error(`讀取試算表失敗 (HTTP ${res.status})`);
   const data = await res.json();
   if (!data.success) throw new Error(data.error || '讀取錯誤');
-  return data.words || [];
+  
+  const rawWords = data.words || [];
+  return rawWords
+    .map((w, index) => ({
+      ...w,
+      id: (w.id && String(w.id).trim()) || `sheet-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
+      word: (w.word || '').trim(),
+      state: w.state || 'new',
+      repetition: Number(w.repetition) || 0,
+      interval: Number(w.interval) || 0,
+      easeFactor: Number(w.easeFactor) || 2.5,
+    }))
+    .filter((w) => Boolean(w.word));
 }
 
 /**
  * Merges local and cloud words intelligently.
  * Matches by word spelling or ID.
  * Prefers the record with the most recent lastReviewed / dueDate progress,
- * while preserving rich enriched fields (definition, example, translation).
+ * while adopting content/metadata updates from cloud (definitions, examples, translations, tips).
  */
 export function mergeWordLists(localWords = [], cloudWords = []) {
   const map = new Map();
@@ -122,17 +134,17 @@ export function mergeWordLists(localWords = [], cloudWords = []) {
               easeFactor: Number(cloud.easeFactor) || existing.easeFactor || 2.5,
             }
           : {}),
-        // Fill any empty metadata fields from whichever source has them
-        ipa: existing.ipa || cloud.ipa || '',
-        pos: existing.pos || cloud.pos || '',
-        simpleDefinition: existing.simpleDefinition || cloud.simpleDefinition || '',
-        collocation: existing.collocation || cloud.collocation || '',
-        example: existing.example || cloud.example || '',
-        exampleZh: existing.exampleZh || cloud.exampleZh || '',
-        chinese: existing.chinese || cloud.chinese || '',
-        toeicTip: existing.toeicTip || cloud.toeicTip || '',
-        level: existing.level || cloud.level || 'L2',
-        category: existing.category || cloud.category || '自訂生詞',
+        // Content/metadata edits from Sheet override local values when provided
+        ipa: cloud.ipa !== undefined && cloud.ipa !== '' ? cloud.ipa : (existing.ipa || ''),
+        pos: cloud.pos !== undefined && cloud.pos !== '' ? cloud.pos : (existing.pos || ''),
+        simpleDefinition: cloud.simpleDefinition !== undefined && cloud.simpleDefinition !== '' ? cloud.simpleDefinition : (existing.simpleDefinition || ''),
+        collocation: cloud.collocation !== undefined && cloud.collocation !== '' ? cloud.collocation : (existing.collocation || ''),
+        example: cloud.example !== undefined && cloud.example !== '' ? cloud.example : (existing.example || ''),
+        exampleZh: cloud.exampleZh !== undefined && cloud.exampleZh !== '' ? cloud.exampleZh : (existing.exampleZh || ''),
+        chinese: cloud.chinese !== undefined && cloud.chinese !== '' ? cloud.chinese : (existing.chinese || ''),
+        toeicTip: cloud.toeicTip !== undefined && cloud.toeicTip !== '' ? cloud.toeicTip : (existing.toeicTip || ''),
+        level: cloud.level !== undefined && cloud.level !== '' ? cloud.level : (existing.level || 'L2'),
+        category: cloud.category !== undefined && cloud.category !== '' ? cloud.category : (existing.category || '自訂生詞'),
       });
     }
   }

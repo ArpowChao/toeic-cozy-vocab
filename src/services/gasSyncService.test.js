@@ -93,6 +93,32 @@ describe('gasSyncService - mergeWordLists', () => {
       example: 'One year warranty included.', // merges cloud example
     });
   });
+
+  it('updates word definitions, chinese, and examples when edited in Google Sheet', () => {
+    const localWords = [
+      {
+        id: '1',
+        word: 'liability',
+        chinese: '負債',
+        example: 'Old example',
+        lastReviewed: '2026-09-03',
+      },
+    ];
+    const cloudWords = [
+      {
+        id: '1',
+        word: 'liability',
+        chinese: '負擔、責任、妨礙',
+        example: 'He is considered a liability.',
+      },
+    ];
+
+    const merged = mergeWordLists(localWords, cloudWords);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].chinese).toBe('負擔、責任、妨礙');
+    expect(merged[0].example).toBe('He is considered a liability.');
+  });
 });
 
 describe('gasSyncService - syncWithCloud', () => {
