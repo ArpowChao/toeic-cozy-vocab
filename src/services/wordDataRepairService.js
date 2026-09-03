@@ -8,6 +8,7 @@ const FABRICATED_PATTERNS = [
   /^the management decided to\b/i,
   /\[(?:in )?(?:the workplace|business context)/i,
   /^（(?:待複習|可於複習時隨時查看|點擊手動輸入中文釋義)）$/,
+  /^Hard, difficult; wearisome, tedious\.$/i,
 ];
 
 function containsFabricatedData(word) {

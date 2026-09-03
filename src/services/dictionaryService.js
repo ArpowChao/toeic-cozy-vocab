@@ -44,7 +44,12 @@ function chooseBestCandidate(candidates) {
         (score, term) => score + (text.includes(term) ? 1 : 0),
         0
       );
-      return { candidate, index, score: businessScore * 10 + (candidate.example ? 1 : 0) };
+      const inflectionScore = candidate.isInflectedForm ? 5 : 0;
+      return {
+        candidate,
+        index,
+        score: businessScore * 10 + inflectionScore + (candidate.example ? 1 : 0),
+      };
     })
     .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.candidate || null;
 }
@@ -75,6 +80,9 @@ function findBestDefinition(entry) {
         partOfSpeech: meaning.partOfSpeech || '',
         definition: definition.definition,
         example: definition.example || '',
+        isInflectedForm: /\b(?:simple )?past(?: tense| participle)? of\b|\bplural of\b/i.test(
+          definition.definition
+        ),
       }))
   );
 
@@ -104,13 +112,19 @@ async function lookupWiktionary(cleanWord) {
     const candidates = (data.en || []).flatMap((meaning) =>
       (meaning.definitions || [])
         .filter((definition) => definition?.definition)
-        .map((definition) => ({
-          partOfSpeech: (meaning.partOfSpeech || '').toLowerCase(),
-          definition: stripHtml(definition.definition),
-          example: stripHtml(
-            definition.parsedExamples?.[0]?.example || definition.examples?.[0] || ''
-          ),
-        }))
+        .map((definition) => {
+          const rawDefinition = definition.definition;
+          return {
+            partOfSpeech: (meaning.partOfSpeech || '').toLowerCase(),
+            definition: stripHtml(rawDefinition),
+            example: stripHtml(
+              definition.parsedExamples?.[0]?.example || definition.examples?.[0] || ''
+            ),
+            isInflectedForm:
+              rawDefinition.includes('form-of-definition') ||
+              /\b(?:simple )?past(?: tense| participle)? of\b|\bplural of\b/i.test(rawDefinition),
+          };
+        })
     );
     return chooseBestCandidate(candidates);
   } catch (error) {

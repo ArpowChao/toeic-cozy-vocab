@@ -41,6 +41,34 @@ describe('repairFabricatedWordData', () => {
     expect(saveWords).toHaveBeenCalledWith([result.words[0]]);
   });
 
+  it('repairs the previously selected obsolete adjective sense of tore', async () => {
+    const word = {
+      id: 'custom-tore',
+      word: 'tore',
+      pos: 'adj.',
+      simpleDefinition: 'Hard, difficult; wearisome, tedious.',
+      state: 'new',
+      repetition: 0,
+      interval: 0,
+    };
+    const lookup = vi.fn().mockResolvedValue({
+      word: 'tore',
+      pos: 'v.',
+      simpleDefinition: 'simple past of tear (“rip, rend”).',
+      chinese: '撕裂',
+    });
+    const saveWords = vi.fn().mockResolvedValue({ synced: true });
+
+    const result = await repairFabricatedWordData([word], { lookup, saveWords });
+
+    expect(result.repairedCount).toBe(1);
+    expect(result.words[0]).toMatchObject({
+      id: 'custom-tore',
+      pos: 'v.',
+      simpleDefinition: 'simple past of tear (“rip, rend”).',
+    });
+  });
+
   it('does nothing when no fabricated placeholders are present', async () => {
     const words = [{ id: 'custom-1', word: 'budget', simpleDefinition: 'a plan for spending money' }];
     const lookup = vi.fn();

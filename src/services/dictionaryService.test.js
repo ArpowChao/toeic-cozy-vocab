@@ -51,6 +51,29 @@ describe('lookupWordOnline', () => {
     expect(result.exampleZh).toBe('公司撥出額外資金用於員工訓練。');
   });
 
+  it('prefers a common inflected verb form over an obsolete-looking adjective sense', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(response({}, false))
+      .mockResolvedValueOnce(response({ en: [
+        {
+          partOfSpeech: 'Adjective',
+          definitions: [{ definition: 'Hard, difficult; wearisome, tedious.' }]
+        },
+        {
+          partOfSpeech: 'Verb',
+          definitions: [{
+            definition: '<span class="form-of-definition">simple past of <i>tear</i> (“rip, rend”)</span>.'
+          }]
+        }
+      ] }))
+      .mockResolvedValueOnce(response({ responseData: { translatedText: '撕裂' } })));
+
+    const result = await lookupWordOnline('tore');
+
+    expect(result.pos).toBe('v.');
+    expect(result.simpleDefinition).toBe('simple past of tear (“rip, rend”).');
+  });
+
   it('keeps a sourced example paired with the definition and part of speech it illustrates', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(response([{
