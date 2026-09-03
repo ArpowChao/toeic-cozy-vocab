@@ -72,13 +72,13 @@ describe('SM-2 SRS Algorithm', () => {
   it('should correctly identify due words', () => {
     const words = [
       { id: '1', word: 'due1', dueDate: '2026-09-01', state: 'learning' },
-      { id: '2', word: 'due2', dueDate: '2026-09-02', state: 'learning' },
-      { id: '3', word: 'future', dueDate: '2026-09-10', state: 'learning' },
+      { id: '2', word: 'due2', dueDate: '2026-09-02T16:00:00.000Z', state: 'learning' },
+      { id: '3', word: 'future', dueDate: '2026-09-10T16:00:00.000Z', state: 'learning' },
       { id: '4', word: 'newWord', state: 'new' },
     ];
 
     const dueToday = filterDueWords(words, '2026-09-02');
-    expect(dueToday.length).toBe(3); // due1, due2, newWord
+    expect(dueToday.length).toBe(3); // due1, due2 (ISO string), newWord
     expect(dueToday.map((w) => w.id)).toEqual(['1', '2', '4']);
   });
 

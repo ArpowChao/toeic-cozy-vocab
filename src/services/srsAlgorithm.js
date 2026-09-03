@@ -103,10 +103,11 @@ export function formatDate(date = new Date()) {
  */
 export function isWordDue(word, targetDate = new Date()) {
   if (!word) return false;
-  const targetDateStr = typeof targetDate === 'string' ? targetDate : formatDate(targetDate);
+  const targetDateStr = typeof targetDate === 'string' ? targetDate.split('T')[0] : formatDate(targetDate);
   // 新單字 (沒有 dueDate) 或 已達複習日
   if (!word.dueDate || word.state === 'new') return true;
-  return word.dueDate <= targetDateStr;
+  const dueStr = String(word.dueDate).split('T')[0];
+  return dueStr <= targetDateStr;
 }
 
 /**

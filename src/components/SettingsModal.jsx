@@ -122,7 +122,10 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
         const merged = mergeWordLists(localWords, pulledWords);
         await saveWordsBatch(merged);
         await onReloadWords();
-        showStatus('success', `成功從 Google 試算表同步 ${pulledWords.length} 個單字！`);
+        showStatus('success', `成功從 Google 試算表同步 ${pulledWords.length} 個單字！即將刷新畫面...`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         showStatus('error', '試算表內目前無單字資料。');
       }

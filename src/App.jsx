@@ -110,6 +110,12 @@ export default function App() {
         await saveWordsBatch(syncResult.words);
         setWords(syncResult.words);
         setSyncStatus('synced');
+        confetti({
+          particleCount: 35,
+          spread: 50,
+          origin: { y: 0.1, x: 0.8 },
+          colors: ['#789D80', '#D3A376', '#5C4033'],
+        });
       } else {
         setSyncStatus('error');
       }

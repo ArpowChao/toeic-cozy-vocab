@@ -44,7 +44,37 @@ const LS_SETTINGS_KEY = 'cozy_toeic_settings';
 const LS_LOGS_KEY = 'cozy_toeic_logs';
 
 /**
- * Initialize storage with default seed words if empty
+ * Deduplicate word list by spelling, keeping the richer record (with definition/ipa/chinese)
+ */
+export function deduplicateWordList(words) {
+  const map = new Map();
+  const duplicatesToDelete = [];
+
+  for (const w of words) {
+    if (!w || !w.word) continue;
+    const key = w.word.toLowerCase().trim();
+    if (!map.has(key)) {
+      map.set(key, w);
+    } else {
+      const existing = map.get(key);
+      const existingScore = (existing.simpleDefinition?.trim() ? 2 : 0) + (existing.chinese?.trim() ? 2 : 0) + (existing.ipa?.trim() ? 1 : 0);
+      const newScore = (w.simpleDefinition?.trim() ? 2 : 0) + (w.chinese?.trim() ? 2 : 0) + (w.ipa?.trim() ? 1 : 0);
+
+      if (newScore > existingScore) {
+        if (existing.id) duplicatesToDelete.push(existing.id);
+        map.set(key, { ...existing, ...w });
+      } else {
+        if (w.id) duplicatesToDelete.push(w.id);
+        map.set(key, { ...w, ...existing });
+      }
+    }
+  }
+
+  return { uniqueWords: Array.from(map.values()), duplicatesToDelete };
+}
+
+/**
+ * Initialize storage with default seed words if empty, and clean up duplicate records
  */
 export async function initStorage() {
   const words = await getAllWords();
@@ -52,6 +82,16 @@ export async function initStorage() {
     await saveWordsBatch(TOEIC_SEED_WORDS);
     return TOEIC_SEED_WORDS;
   }
+
+  const { uniqueWords, duplicatesToDelete } = deduplicateWordList(words);
+  if (duplicatesToDelete.length > 0) {
+    for (const id of duplicatesToDelete) {
+      await deleteWord(id);
+    }
+    await saveWordsBatch(uniqueWords);
+    return uniqueWords;
+  }
+
   return words;
 }
 
@@ -113,25 +153,54 @@ export async function saveWord(word) {
 }
 
 /**
- * Save words in batch
+ * Save words in batch with duplicate ID cleanup
  */
 export async function saveWordsBatch(newWords) {
   const db = await openDB();
   if (!db) {
     const existing = await getAllWords();
-    const map = new Map(existing.map((w) => [w.id, w]));
-    newWords.forEach((w) => map.set(w.id, w));
+    const map = new Map();
+    existing.forEach((w) => {
+      if (w?.word) map.set(w.word.toLowerCase().trim(), w);
+    });
+    newWords.forEach((w) => {
+      if (!w?.word) return;
+      const key = w.word.toLowerCase().trim();
+      const prev = map.get(key);
+      map.set(key, { ...prev, ...w });
+    });
     const merged = Array.from(map.values());
     localStorage.setItem(LS_WORDS_KEY, JSON.stringify(merged));
     return merged;
+  }
+
+  // Check for any conflicting old IDs in IndexedDB
+  const existingWords = await getAllWords();
+  const existingByWord = new Map();
+  existingWords.forEach((w) => {
+    if (w?.word) existingByWord.set(w.word.toLowerCase().trim(), w);
+  });
+
+  const idsToDelete = [];
+  const finalWords = [];
+
+  for (const nw of newWords) {
+    if (!nw?.word) continue;
+    const key = nw.word.toLowerCase().trim();
+    const match = existingByWord.get(key);
+    if (match && match.id !== nw.id) {
+      idsToDelete.push(match.id);
+    }
+    finalWords.push(nw);
   }
 
   return new Promise((resolve, reject) => {
     try {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      newWords.forEach((w) => store.put(w));
-      transaction.oncomplete = () => resolve(newWords);
+      idsToDelete.forEach((id) => store.delete(id));
+      finalWords.forEach((w) => store.put(w));
+      transaction.oncomplete = () => resolve(finalWords);
       transaction.onerror = () => reject(transaction.error);
     } catch (e) {
       reject(e);
