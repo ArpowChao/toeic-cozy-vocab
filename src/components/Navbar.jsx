@@ -1,7 +1,7 @@
 import React from 'react';
-import { BookOpen, Search, Trophy, Sparkles, Plus, Settings, Flame, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { BookOpen, Search, Trophy, Sparkles, Plus, Settings, Flame, Loader2, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 
-export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettings, dueCount = 0, syncStatus = 'idle' }) {
+export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettings, onSync, dueCount = 0, syncStatus = 'idle' }) {
   const navItems = [
     { id: 'study', label: '沉浸自習', icon: BookOpen, badge: dueCount > 0 ? dueCount : null },
     { id: 'quiz', label: '實戰測驗', icon: Sparkles },
@@ -72,12 +72,13 @@ export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettin
           )}
           {syncStatus === 'synced' && (
             <button
-              onClick={onOpenSettings}
-              className="hidden md:flex items-center gap-1.5 text-xs text-sage-800 bg-sage-50 hover:bg-sage-100 border border-sage-200 px-3 py-1.5 rounded-2xl font-bold transition shadow-2xs"
-              title="Google Sheets 雲端已同步（點擊開啟設定）"
+              onClick={onSync || onOpenSettings}
+              className="hidden md:flex items-center gap-1.5 text-xs text-sage-800 bg-sage-50 hover:bg-sage-100 border border-sage-200 px-3 py-1.5 rounded-2xl font-bold transition shadow-2xs active:scale-95"
+              title="已連線 Google Sheets，點擊立即重新同步試算表最新修改"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-sage-600" />
               <span>雲端已同步</span>
+              <RotateCcw className="w-3 h-3 text-sage-500 ml-0.5" />
             </button>
           )}
           {syncStatus === 'error' && (

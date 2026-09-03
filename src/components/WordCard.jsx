@@ -148,9 +148,15 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
           <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-latte-600 uppercase tracking-wider mb-2">
             <BookOpen className="w-4 h-4 sm:w-5 h-5 text-latte-500" /> Simple English Definition
           </div>
-          <p className="text-base sm:text-xl text-cozyDark-400 leading-relaxed font-normal">
-            "{word.simpleDefinition}"
-          </p>
+          {word.simpleDefinition?.trim() ? (
+            <p className="text-base sm:text-xl text-cozyDark-400 leading-relaxed font-normal">
+              "{word.simpleDefinition}"
+            </p>
+          ) : (
+            <p className="text-sm sm:text-base text-cozyDark-200 italic leading-relaxed">
+              （尚未設定英英定義，可於 Google 試算表編輯或展開下方中文考點）
+            </p>
+          )}
         </div>
 
         {/* Section 2: TOEIC Collocation (黃金搭配詞) */}

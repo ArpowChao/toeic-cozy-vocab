@@ -40,8 +40,29 @@ export default function App() {
   // Load initial words and logs from IndexedDB, then auto-sync from cloud in background
   useEffect(() => {
     loadData();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const gasUrl = getSavedGasUrl();
+        if (gasUrl) {
+          getAllWords().then((localWords) => {
+            syncWithCloud(localWords, gasUrl).then((syncResult) => {
+              if (syncResult.synced && syncResult.words) {
+                saveWordsBatch(syncResult.words).then(() => {
+                  setWords(syncResult.words);
+                  setSyncStatus('synced');
+                });
+              }
+            }).catch(() => {});
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -73,6 +94,28 @@ export default function App() {
         console.warn('Background auto-pull failed:', err);
         setSyncStatus('error');
       }
+    }
+  };
+
+  // Immediate manual pull from Google Sheets
+  const handleManualSync = async () => {
+    const gasUrl = getSavedGasUrl();
+    if (!gasUrl) return;
+
+    setSyncStatus('syncing');
+    try {
+      const currentWords = await getAllWords();
+      const syncResult = await syncWithCloud(currentWords, gasUrl);
+      if (syncResult.synced) {
+        await saveWordsBatch(syncResult.words);
+        setWords(syncResult.words);
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (err) {
+      console.warn('Manual sync failed:', err);
+      setSyncStatus('error');
     }
   };
 
@@ -158,6 +201,7 @@ export default function App() {
         onSelectTab={setActiveTab}
         onOpenAdd={() => setIsAddModalOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onSync={handleManualSync}
         dueCount={dueWords.length}
         syncStatus={syncStatus}
       />
