@@ -1,6 +1,7 @@
 /**
  * Dictionary & Word Auto-enrichment Service
- * Uses Free Dictionary API + MyMemory Translation API with offline fallback
+ * Uses Free Dictionary API + MyMemory Translation API.
+ * Missing source data stays empty: this service never fabricates definitions or examples.
  */
 
 const COMMON_BUSINESS_COLLOCATIONS = {
@@ -18,8 +19,108 @@ const COMMON_BUSINESS_COLLOCATIONS = {
   unprecedented: 'unprecedented growth / market demand',
 };
 
+const POS_LABELS = {
+  noun: 'n.',
+  verb: 'v.',
+  adjective: 'adj.',
+  adverb: 'adv.',
+  pronoun: 'pron.',
+  preposition: 'prep.',
+  conjunction: 'conj.',
+  interjection: 'interj.',
+};
+
+const TOEIC_CONTEXT_TERMS = [
+  'business', 'company', 'office', 'employee', 'staff', 'customer', 'client',
+  'management', 'meeting', 'contract', 'project', 'fund', 'budget', 'sale',
+  'market', 'shipment', 'schedule', 'training', 'conference', 'report',
+];
+
+function chooseBestCandidate(candidates) {
+  return candidates
+    .map((candidate, index) => {
+      const text = `${candidate.definition} ${candidate.example}`.toLowerCase();
+      const businessScore = TOEIC_CONTEXT_TERMS.reduce(
+        (score, term) => score + (text.includes(term) ? 1 : 0),
+        0
+      );
+      return { candidate, index, score: businessScore * 10 + (candidate.example ? 1 : 0) };
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.candidate || null;
+}
+
+async function translateToTraditionalChinese(text) {
+  if (!text) return '';
+
+  try {
+    const response = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh-TW`
+    );
+    if (!response.ok) return '';
+
+    const data = await response.json();
+    const translated = data.responseData?.translatedText?.trim();
+    return translated && translated.toLowerCase() !== text.toLowerCase() ? translated : '';
+  } catch (error) {
+    console.warn('Translation lookup failed:', error);
+    return '';
+  }
+}
+
+function findBestDefinition(entry) {
+  const candidates = (entry.meanings || []).flatMap((meaning) =>
+    (meaning.definitions || [])
+      .filter((definition) => definition?.definition)
+      .map((definition) => ({
+        partOfSpeech: meaning.partOfSpeech || '',
+        definition: definition.definition,
+        example: definition.example || '',
+      }))
+  );
+
+  return chooseBestCandidate(candidates);
+}
+
+function stripHtml(value = '') {
+  return value
+    .replace(/<[^>]*>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function lookupWiktionary(cleanWord) {
+  try {
+    const response = await fetch(
+      `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(cleanWord)}`
+    );
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const candidates = (data.en || []).flatMap((meaning) =>
+      (meaning.definitions || [])
+        .filter((definition) => definition?.definition)
+        .map((definition) => ({
+          partOfSpeech: (meaning.partOfSpeech || '').toLowerCase(),
+          definition: stripHtml(definition.definition),
+          example: stripHtml(
+            definition.parsedExamples?.[0]?.example || definition.examples?.[0] || ''
+          ),
+        }))
+    );
+    return chooseBestCandidate(candidates);
+  } catch (error) {
+    console.warn('Wiktionary lookup failed:', error);
+    return null;
+  }
+}
+
 /**
- * Fetch word details automatically
+ * Fetch sourced word details automatically.
  * @param {string} wordText
  * @returns {Promise<Object>} Enriched word data
  */
@@ -28,77 +129,55 @@ export async function lookupWordOnline(wordText) {
   if (!cleanWord) return null;
 
   let ipa = '';
-  let pos = 'n.';
+  let pos = '';
   let simpleDefinition = '';
   let example = '';
-  let chinese = '';
 
-  // 1. Try Free Dictionary API
   try {
-    const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`);
+    const dictRes = await fetch(
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`
+    );
     if (dictRes.ok) {
       const data = await dictRes.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const entry = data[0];
-        
-        // Find phonetic
-        ipa = entry.phonetic || (entry.phonetics?.find((p) => p.text)?.text) || '';
-
-        // Find primary meaning
-        if (entry.meanings && entry.meanings.length > 0) {
-          const primaryMeaning = entry.meanings[0];
-          pos = primaryMeaning.partOfSpeech ? `${primaryMeaning.partOfSpeech.substring(0, 3)}.` : 'v.';
-          
-          if (primaryMeaning.definitions && primaryMeaning.definitions.length > 0) {
-            const defObj = primaryMeaning.definitions[0];
-            simpleDefinition = defObj.definition || '';
-            example = defObj.example || '';
-          }
+      const entry = Array.isArray(data) ? data[0] : null;
+      if (entry) {
+        ipa = entry.phonetic || entry.phonetics?.find((item) => item.text)?.text || '';
+        const bestDefinition = findBestDefinition(entry);
+        if (bestDefinition) {
+          pos = POS_LABELS[bestDefinition.partOfSpeech] || bestDefinition.partOfSpeech || '';
+          simpleDefinition = bestDefinition.definition;
+          example = bestDefinition.example;
         }
       }
     }
-  } catch (err) {
-    console.warn('Free Dictionary lookup failed, using fallback:', err);
+  } catch (error) {
+    console.warn('Free Dictionary lookup failed:', error);
   }
 
-  // 2. Try MyMemory Translation API for Traditional Chinese
-  try {
-    const transRes = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanWord)}&langpair=en|zh-TW`
-    );
-    if (transRes.ok) {
-      const transData = await transRes.json();
-      if (transData.responseData?.translatedText) {
-        chinese = transData.responseData.translatedText;
-      }
-    }
-  } catch (err) {
-    console.warn('Translation lookup failed:', err);
-  }
-
-  // 3. Fallbacks and defaults
-  if (!simpleDefinition) {
-    simpleDefinition = `to act, use, or manage ${cleanWord} in a practical or business context`;
-  }
-
-  const collocation = COMMON_BUSINESS_COLLOCATIONS[cleanWord] || `${cleanWord} [in the workplace / for the project]`;
-  
   if (!example) {
-    example = `The management decided to ${cleanWord} the new proposal during the quarterly meeting.`;
+    const wiktionaryDefinition = await lookupWiktionary(cleanWord);
+    if (wiktionaryDefinition) {
+      pos = POS_LABELS[wiktionaryDefinition.partOfSpeech] || wiktionaryDefinition.partOfSpeech || '';
+      simpleDefinition = wiktionaryDefinition.definition;
+      example = wiktionaryDefinition.example;
+    }
   }
+
+  const chinese = await translateToTraditionalChinese(cleanWord);
+  const exampleZh = example ? await translateToTraditionalChinese(example) : '';
 
   return {
     word: cleanWord,
-    ipa: ipa || `/${cleanWord}/`,
-    pos: pos || 'v.',
+    ipa,
+    pos,
     level: 'L2',
     category: '自訂生詞',
     simpleDefinition,
-    collocation,
+    collocation: COMMON_BUSINESS_COLLOCATIONS[cleanWord] || '',
     example,
-    exampleZh: chinese ? `例句（參考）：管理階層決定在季度會議上探討相關事宜。` : '',
-    chinese: chinese || '（點擊手動輸入中文釋義）',
-    toeicTip: '多益重點：請留意本單字在商務句型中的搭配詞與動名詞詞性轉換。',
+    exampleZh,
+    chinese,
+    toeicTip: '',
     derivatives: '',
     state: 'new',
     repetition: 0,

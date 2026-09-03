@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Sparkles, Plus, Layers, Loader2, CheckCircle2, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Sparkles, Plus, Layers, Loader2, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { lookupWordOnline } from '../services/dictionaryService.js';
-import { saveWord, saveWordsBatch } from '../services/storageService.js';
+import { saveWordAndSync, saveWordsAndSync } from '../services/wordSaveService.js';
 import { soundEffects } from '../services/ttsService.js';
 
 export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
@@ -12,6 +12,7 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
   const [batchText, setBatchText] = useState('');
   const [batchProgress, setBatchProgress] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [syncNotice, setSyncNotice] = useState(null);
   
   // Optional advanced manual overrides
   const [advancedData, setAdvancedData] = useState({
@@ -30,6 +31,7 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
       setLastAddedWord(null);
+      setSyncNotice(null);
     }
   }, [isOpen]);
 
@@ -43,6 +45,7 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
 
     setIsLoading(true);
     setLastAddedWord(null);
+    setSyncNotice(null);
 
     try {
       // 1. Fully automate online lookup (IPA, POS, English Definition, Collocation, Example, Chinese)
@@ -54,10 +57,10 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
         id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         level: advancedData.level || enriched?.level || 'L2',
         category: advancedData.category || enriched?.category || '自訂生詞',
-        simpleDefinition: advancedData.simpleDefinition || enriched?.simpleDefinition || `to manage or apply ${query}`,
-        collocation: advancedData.collocation || enriched?.collocation || `${query} [in business context]`,
-        example: advancedData.example || enriched?.example || `Please review the ${query} for the upcoming meeting.`,
-        chinese: advancedData.chinese || enriched?.chinese || '（可於複習時隨時查看）',
+        simpleDefinition: advancedData.simpleDefinition || enriched?.simpleDefinition || '',
+        collocation: advancedData.collocation || enriched?.collocation || '',
+        example: advancedData.example || enriched?.example || '',
+        chinese: advancedData.chinese || enriched?.chinese || '',
         state: 'new',
         repetition: 0,
         interval: 0,
@@ -65,11 +68,14 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
         dueDate: null,
       };
 
-      await saveWord(newWord);
+      const saveResult = await saveWordAndSync(newWord);
       onWordAdded(newWord);
       soundEffects.playSuccess();
 
       setLastAddedWord(newWord);
+      setSyncNotice(saveResult.synced
+        ? { type: 'success', text: `已同步到 Google Sheet（共 ${saveResult.count} 個單字）` }
+        : { type: 'warning', text: '單字已存到本機，但 Google Sheet 同步失敗；請到設定檢查連線。' });
       setWordInput('');
       setAdvancedData({
         pos: 'v.',
@@ -102,6 +108,7 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
     if (rawWords.length === 0) return;
 
     setIsLoading(true);
+    setSyncNotice(null);
     const enrichedList = [];
 
     for (let i = 0; i < rawWords.length; i++) {
@@ -123,14 +130,15 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
         enrichedList.push({
           id: `batch-${Date.now()}-${i}`,
           word: w,
-          ipa: `/${w}/`,
-          pos: 'n./v.',
+          ipa: '',
+          pos: '',
           level: 'L2',
           category: '自訂生詞',
-          simpleDefinition: `Concept for ${w}`,
-          collocation: `${w} in business context`,
-          example: `Please review ${w} carefully.`,
-          chinese: '（待複習）',
+          simpleDefinition: '',
+          collocation: '',
+          example: '',
+          exampleZh: '',
+          chinese: '',
           state: 'new',
           repetition: 0,
           interval: 0,
@@ -140,13 +148,15 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
       }
     }
 
-    await saveWordsBatch(enrichedList);
+    const saveResult = await saveWordsAndSync(enrichedList);
     onWordAdded(enrichedList);
     soundEffects.playSuccess();
     setIsLoading(false);
     setBatchProgress(null);
     setBatchText('');
-    onClose();
+    setSyncNotice(saveResult.synced
+      ? { type: 'success', text: `已新增 ${enrichedList.length} 個單字並同步到 Google Sheet（共 ${saveResult.count} 個）` }
+      : { type: 'warning', text: `已新增 ${enrichedList.length} 個單字到本機，但 Google Sheet 同步失敗。` });
   };
 
   return (
@@ -198,6 +208,18 @@ export default function AddWordModal({ isOpen, onClose, onWordAdded }) {
 
         {/* Modal Body */}
         <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-5">
+          {syncNotice && (
+            <div className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold flex items-start gap-2 ${
+              syncNotice.type === 'success'
+                ? 'bg-sage-50 border-sage-200 text-sage-800'
+                : 'bg-amberGold-50 border-amberGold-200 text-amberGold-800'
+            }`}>
+              {syncNotice.type === 'success'
+                ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
+              <span>{syncNotice.text}</span>
+            </div>
+          )}
           {activeTab === 'quick' ? (
             <form onSubmit={handleQuickAdd} className="space-y-5">
               {/* Success Notification */}

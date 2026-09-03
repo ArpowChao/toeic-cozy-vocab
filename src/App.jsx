@@ -20,6 +20,7 @@ import {
   filterDueWords,
   calculateLearningStats,
 } from './services/srsAlgorithm.js';
+import { repairFabricatedWordData } from './services/wordDataRepairService.js';
 import confetti from 'canvas-confetti';
 import { Sparkles, CheckCircle2, RotateCcw, Plus, Flame } from 'lucide-react';
 
@@ -38,7 +39,8 @@ export default function App() {
 
   const loadData = async () => {
     const loadedWords = await initStorage();
-    setWords(loadedWords);
+    const repairResult = await repairFabricatedWordData(loadedWords);
+    setWords(repairResult.words);
     const logs = await getStudyLogs();
     setStudyLogs(logs);
     const todayStr = new Date().toISOString().split('T')[0];
