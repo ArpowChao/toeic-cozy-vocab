@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Cloud, CloudUpload, CloudDownload, Download, Upload, RotateCcw, Volume2, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { getSavedGasUrl, saveGasUrl, testGasConnection, pushWordsToGas, pullWordsFromGas, mergeWordLists } from '../services/gasSyncService.js';
 import { exportToJSON, getAllWords, saveWordsBatch, resetToDefault } from '../services/storageService.js';
-import { setTTSConfig } from '../services/ttsService.js';
+import { setTTSConfig, getTTSConfig } from '../services/ttsService.js';
 
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
@@ -70,8 +70,9 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
   const [gasUrl, setGasUrl] = useState(getSavedGasUrl());
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success' | 'error', text: string }
   const [isLoading, setIsLoading] = useState(false);
-  const [accent, setAccent] = useState('en-US');
-  const [speechRate, setSpeechRate] = useState(1.0);
+  const initialTTS = getTTSConfig();
+  const [accent, setAccent] = useState(initialTTS.accent);
+  const [speechRate, setSpeechRate] = useState(initialTTS.rate);
 
   if (!isOpen) return null;
 
@@ -313,9 +314,10 @@ export default function SettingsModal({ isOpen, onClose, words, onReloadWords })
                   onChange={(e) => handleRateChange(parseFloat(e.target.value))}
                   className="w-full px-3 py-2 rounded-xl border border-cream-300 text-xs bg-white text-latte-800"
                 >
-                  <option value="0.8">0.8x (清晰慢速)</option>
+                  <option value="0.75">0.75x (慢速自習 · 清晰拆解)</option>
+                  <option value="0.88">0.88x (自然舒適 · 推薦單字)</option>
                   <option value="1.0">1.0x (標準速度)</option>
-                  <option value="1.2">1.2x (多益聽力挑戰)</option>
+                  <option value="1.2">1.2x (多益聽力考場挑戰)</option>
                 </select>
               </div>
             </div>

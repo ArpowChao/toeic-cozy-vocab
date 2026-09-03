@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Volume2, Sparkles, Eye, EyeOff, BookOpen, Layers, ArrowRight, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { speakText, soundEffects } from '../services/ttsService.js';
 import { RATING } from '../services/srsAlgorithm.js';
+import PhoneticsGuideModal from './PhoneticsGuideModal.jsx';
 
 export default function WordCard({ word, onRate, autoPlayAudio = true }) {
   const [isRevealed, setIsRevealed] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPhoneticsOpen, setIsPhoneticsOpen] = useState(false);
 
   // Reset reveal state when word changes
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
         handleRate(RATING.GOOD);
       } else if (e.key === '4') {
         handleRate(RATING.EASY);
-      } else if (e.key.toLowerCase() === 'r') {
+      } else if (e.key === 'r' || e.key === 'R') {
         handlePronounce(word.word, 'en-US');
       }
     };
@@ -48,9 +50,9 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
     setIsRevealed((prev) => !prev);
   };
 
-  const handlePronounce = async (text, accent = 'en-US') => {
+  const handlePronounce = async (text, accent = 'en-US', rate) => {
     setIsSpeaking(true);
-    await speakText(text, accent);
+    await speakText(text, accent, rate);
     setIsSpeaking(false);
   };
 
@@ -97,20 +99,27 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
           </div>
 
           {/* Quick Audio & Dictionary Controls */}
-          <div className="flex items-center gap-2 bg-cream-100 p-1.5 rounded-2xl border border-cream-200">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-cream-100 p-1.5 rounded-2xl border border-cream-200 flex-wrap sm:flex-nowrap">
             <button
               onClick={() => handlePronounce(word.word, 'en-US')}
-              className="text-xs sm:text-sm font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-latte-100 text-latte-700 shadow-sm transition flex items-center gap-1.5 active:scale-95"
-              title="美式發音 (按 R 鍵)"
+              className="text-xs sm:text-sm font-bold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-latte-100 text-latte-700 shadow-sm transition flex items-center gap-1 active:scale-95"
+              title="美式標準發音 (按 R 鍵)"
             >
-              <Volume2 className="w-4 h-4 text-latte-500" /> 🇺🇸 美音
+              <Volume2 className="w-3.5 h-3.5 text-latte-500" /> 🇺🇸 美音
             </button>
             <button
               onClick={() => handlePronounce(word.word, 'en-GB')}
-              className="text-xs sm:text-sm font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-latte-100 text-latte-700 shadow-sm transition flex items-center gap-1.5 active:scale-95"
-              title="英式發音"
+              className="text-xs sm:text-sm font-bold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-latte-100 text-latte-700 shadow-sm transition flex items-center gap-1 active:scale-95"
+              title="英式標準發音"
             >
-              <Volume2 className="w-4 h-4 text-latte-500" /> 🇬🇧 英音
+              <Volume2 className="w-3.5 h-3.5 text-latte-500" /> 🇬🇧 英音
+            </button>
+            <button
+              onClick={() => handlePronounce(word.word, 'en-US', 0.72)}
+              className="text-xs sm:text-sm font-bold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-amberGold-100 text-amberGold-800 shadow-sm transition flex items-center gap-1 active:scale-95"
+              title="0.72x 慢速清晰朗讀"
+            >
+              <span>🐢 慢速</span>
             </button>
             <a
               href={`https://dictionary.cambridge.org/zht/%E8%A9%9E%E5%85%B8/%E8%8B%B1%E8%AA%9E-%E6%BC%A2%E8%AA%9E-%E7%B9%81%E9%AB%94/${encodeURIComponent(word.word)}`}
@@ -136,11 +145,21 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
               </span>
             )}
           </div>
-          {word.ipa && (
-            <p className="text-base sm:text-lg font-mono text-cozyDark-200 mt-2">
-              {word.ipa}
-            </p>
-          )}
+          <div className="flex items-center justify-center gap-2.5 mt-2.5 flex-wrap">
+            {word.ipa && (
+              <span className="text-base sm:text-lg font-mono text-cozyDark-300">
+                {word.ipa}
+              </span>
+            )}
+            <button
+              onClick={() => setIsPhoneticsOpen(true)}
+              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-xl bg-cream-100 hover:bg-cream-200 text-latte-700 border border-cream-300 transition shadow-2xs cursor-pointer active:scale-95"
+              title="查看 KK 音標 ⇄ 現代 IPA 對照手冊"
+            >
+              <BookOpen className="w-3 h-3 text-latte-500" />
+              <span>KK 音標對照</span>
+            </button>
+          </div>
         </div>
 
         {/* Section 1: Simple English Definition (英英思維核心) */}
@@ -287,6 +306,12 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
           </div>
         </div>
       </div>
+
+      {/* Phonetics Guide Modal (KK ⇄ IPA) */}
+      <PhoneticsGuideModal
+        isOpen={isPhoneticsOpen}
+        onClose={() => setIsPhoneticsOpen(false)}
+      />
     </div>
   );
 }

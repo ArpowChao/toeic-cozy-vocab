@@ -2,25 +2,40 @@
  * Web Speech API TTS & Pleasant Sound Effects Service
  */
 
+const TTS_ACCENT_KEY = 'cozy_toeic_tts_accent';
+const TTS_RATE_KEY = 'cozy_toeic_tts_rate';
+
 let speechSynth = typeof window !== 'undefined' ? window.speechSynthesis : null;
-let currentAccent = 'en-US'; // 'en-US' or 'en-GB'
-let speechRate = 1.0;
+let currentAccent = (typeof localStorage !== 'undefined' && localStorage.getItem(TTS_ACCENT_KEY)) || 'en-US';
+let speechRate = (typeof localStorage !== 'undefined' && Number(localStorage.getItem(TTS_RATE_KEY))) || 0.88;
 
 /**
- * Configure TTS settings
+ * Configure TTS settings and persist to localStorage
  */
-export function setTTSConfig({ accent = 'en-US', rate = 1.0 }) {
+export function setTTSConfig({ accent = 'en-US', rate = 0.88 }) {
   currentAccent = accent;
-  speechRate = rate;
+  speechRate = Number(rate) || 0.88;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(TTS_ACCENT_KEY, currentAccent);
+    localStorage.setItem(TTS_RATE_KEY, String(speechRate));
+  }
+}
+
+/**
+ * Get current TTS settings
+ */
+export function getTTSConfig() {
+  return { accent: currentAccent, rate: speechRate };
 }
 
 /**
  * Pronounce text in English
  * @param {string} text - Word or sentence to speak
  * @param {string} [overrideAccent] - 'en-US' or 'en-GB'
+ * @param {number} [overrideRate] - Optional speed multiplier (e.g. 0.72 for slow speech)
  * @returns {Promise<void>}
  */
-export function speakText(text, overrideAccent) {
+export function speakText(text, overrideAccent, overrideRate) {
   return new Promise((resolve) => {
     if (!speechSynth || !text) {
       resolve();
@@ -33,7 +48,7 @@ export function speakText(text, overrideAccent) {
     const utterance = new SpeechSynthesisUtterance(text);
     const targetLang = overrideAccent || currentAccent;
     utterance.lang = targetLang;
-    utterance.rate = speechRate;
+    utterance.rate = overrideRate !== undefined ? overrideRate : speechRate;
     utterance.pitch = 1.0;
 
     // Pick suitable voice if available
