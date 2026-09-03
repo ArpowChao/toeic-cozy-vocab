@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, Sparkles, CheckCircle2, XCircle, RotateCcw, ArrowRight, Award } from 'lucide-react';
 import { speakText, soundEffects } from '../services/ttsService.js';
+import { buildChoiceClue, buildChoices, buildQuizTargets, isCustomWord } from '../services/quizService.js';
 import confetti from 'canvas-confetti';
 
 export default function QuizMode({ words = [], onCompleteQuiz }) {
@@ -11,17 +12,16 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [quizType, setQuizType] = useState('choice'); // 'choice' | 'dictation'
+  const [quizScope, setQuizScope] = useState('all'); // 'all' | 'custom' | 'builtin'
   const [userInput, setUserInput] = useState('');
 
   useEffect(() => {
     startNewQuiz();
-  }, [words]);
+  }, [words, quizScope, quizType]);
 
   const startNewQuiz = () => {
     if (!words || words.length === 0) return;
-    // Shuffle and pick up to 10 words
-    const shuffled = [...words].sort(() => 0.5 - Math.random()).slice(0, 10);
-    setQuizList(shuffled);
+    setQuizList(buildQuizTargets(words, { scope: quizScope, quizType }));
     setCurrentIndex(0);
     setSelectedOption(null);
     setIsAnswered(false);
@@ -31,24 +31,15 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
   };
 
   const currentWord = quizList[currentIndex];
-
-  // Generate 4 multiple choices for current word
-  const generateChoices = () => {
-    if (!currentWord) return [];
-    const correct = currentWord;
-    const others = words
-      .filter((w) => w.id !== correct.id)
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 3);
-    return [correct, ...others].sort(() => 0.5 - Math.random());
-  };
+  const currentClue = buildChoiceClue(currentWord);
+  const customWordCount = words.filter(isCustomWord).length;
 
   const [choices, setChoices] = useState([]);
   useEffect(() => {
     if (currentWord && quizType === 'choice') {
-      setChoices(generateChoices());
+      setChoices(buildChoices(currentWord, words));
     }
-  }, [currentWord, quizType]);
+  }, [currentWord, quizType, words]);
 
   const handleSelectChoice = (choice) => {
     if (isAnswered) return;
@@ -97,11 +88,11 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
     }
   };
 
-  if (!words || words.length < 4) {
+  if (!words || words.length === 0) {
     return (
       <div className="bg-white rounded-3xl p-10 text-center max-w-xl mx-auto paper-shadow border border-cream-300">
         <p className="text-base font-bold text-latte-700">
-          單字庫單字數量不足（至少需 4 個單字），請先新增或匯入單字！
+          單字庫目前沒有單字，請先新增或匯入單字！
         </p>
       </div>
     );
@@ -162,7 +153,39 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
             聽音拼寫 (Dictation)
           </button>
         </div>
+
+        <div className="w-full pt-3 border-t border-cream-200 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-cozyDark-200 mr-1">出題範圍：</span>
+          {[
+            { id: 'all', label: `全部 (${words.length})` },
+            { id: 'custom', label: `我的匯入 (${customWordCount})` },
+            { id: 'builtin', label: `內建 (${words.length - customWordCount})` },
+          ].map((scope) => (
+            <button
+              key={scope.id}
+              onClick={() => setQuizScope(scope.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                quizScope === scope.id
+                  ? 'bg-latte-600 text-white shadow-sm'
+                  : 'bg-cream-100 text-latte-700 hover:bg-cream-200'
+              }`}
+            >
+              {scope.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {quizList.length === 0 && (
+        <div className="bg-white rounded-3xl p-8 text-center paper-shadow border border-cream-300 space-y-2">
+          <p className="font-black text-latte-800">這個範圍目前沒有可用題目</p>
+          <p className="text-sm text-cozyDark-200">
+            {quizScope === 'custom' && quizType === 'choice'
+              ? '匯入單字需要英英定義、搭配詞或例句，才能產生選擇題；你也可以切換成聽音拼寫。'
+              : '請改選其他出題範圍或新增單字。'}
+          </p>
+        </div>
+      )}
 
       {/* Main Question Card */}
       {currentWord && (
@@ -181,20 +204,20 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                 </button>
               </div>
 
-              {/* Collocation Clue */}
-              <div className="p-5 sm:p-7 bg-amberGold-50/70 rounded-3xl border border-amberGold-200 mb-4">
+              {/* Best available clue: collocation, example, then definition */}
+              {currentClue && <div className="p-5 sm:p-7 bg-amberGold-50/70 rounded-3xl border border-amberGold-200 mb-4">
                 <div className="text-xs sm:text-sm font-black text-amberGold-700 mb-2 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-600" /> 多益常考搭配語境 (Collocation)：
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-600" /> {currentClue.label}：
                 </div>
                 <div className="text-lg sm:text-2xl font-black text-latte-800 leading-relaxed">
-                  {currentWord.collocation.replace(new RegExp(currentWord.word, 'gi'), '_______')}
+                  {currentClue.text}
                 </div>
-              </div>
+              </div>}
 
               {/* English Definition */}
-              <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-sm sm:text-base text-cozyDark-300">
+              {currentWord.simpleDefinition && currentClue?.label !== '英英提示 (Definition)' && <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-sm sm:text-base text-cozyDark-300">
                 <strong className="text-latte-700">Simple English:</strong> "{currentWord.simpleDefinition}"
-              </div>
+              </div>}
 
               {/* 4 Choices */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
@@ -246,9 +269,9 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                 </p>
               </div>
 
-              <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-xs sm:text-base text-cozyDark-300 text-center">
+              {currentWord.simpleDefinition && <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-xs sm:text-base text-cozyDark-300 text-center">
                 <strong>英英提示：</strong> "{currentWord.simpleDefinition}"
-              </div>
+              </div>}
 
               <input
                 type="text"
