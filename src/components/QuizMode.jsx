@@ -196,28 +196,38 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                 <span className="text-xs sm:text-sm font-extrabold text-latte-500 uppercase tracking-wider">
                   Target Concept & Context
                 </span>
-                <button
-                  onClick={() => speakText(currentWord.word)}
-                  className="text-xs sm:text-sm font-bold text-latte-600 flex items-center gap-1.5 hover:underline px-2.5 py-1 rounded-xl hover:bg-cream-100"
-                >
-                  <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-latte-500" /> 聽單字發音
-                </button>
+                {!isAnswered ? (
+                  currentClue && (
+                    <button
+                      onClick={() => speakText(currentClue.text)}
+                      className="text-xs sm:text-sm font-bold text-latte-600 flex items-center gap-1.5 hover:underline px-2.5 py-1 rounded-xl hover:bg-cream-100"
+                      title="朗讀題幹語境"
+                    >
+                      <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-latte-500" /> 朗讀題幹語境
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={() => speakText(currentWord.word)}
+                    className="text-xs sm:text-sm font-bold text-latte-600 flex items-center gap-1.5 hover:underline px-2.5 py-1 rounded-xl hover:bg-cream-100 animate-fade-in"
+                    title="聽單字發音"
+                  >
+                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-latte-500" /> 聽正確發音 ({currentWord.word})
+                  </button>
+                )}
               </div>
 
               {/* Best available clue: collocation, example, then definition */}
-              {currentClue && <div className="p-5 sm:p-7 bg-amberGold-50/70 rounded-3xl border border-amberGold-200 mb-4">
-                <div className="text-xs sm:text-sm font-black text-amberGold-700 mb-2 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-600" /> {currentClue.label}：
+              {currentClue && (
+                <div className="p-5 sm:p-7 bg-amberGold-50/70 rounded-3xl border border-amberGold-200 mb-4">
+                  <div className="text-xs sm:text-sm font-black text-amberGold-700 mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amberGold-600" /> {currentClue.label}：
+                  </div>
+                  <div className="text-lg sm:text-2xl font-black text-latte-800 leading-relaxed">
+                    {currentClue.text}
+                  </div>
                 </div>
-                <div className="text-lg sm:text-2xl font-black text-latte-800 leading-relaxed">
-                  {currentClue.text}
-                </div>
-              </div>}
-
-              {/* English Definition */}
-              {currentWord.simpleDefinition && currentClue?.label !== '英英提示 (Definition)' && <div className="p-4 sm:p-5 bg-cream-50 rounded-2xl border border-cream-200 text-sm sm:text-base text-cozyDark-300">
-                <strong className="text-latte-700">Simple English:</strong> "{currentWord.simpleDefinition}"
-              </div>}
+              )}
 
               {/* 4 Choices */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
@@ -240,7 +250,12 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                       disabled={isAnswered}
                       className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl text-base sm:text-lg font-bold transition text-left flex items-center justify-between shadow-xs ${btnClass}`}
                     >
-                      <span>{choice.word}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{choice.word}</span>
+                        {choice.pos && (
+                          <span className="text-xs font-mono opacity-60">({choice.pos})</span>
+                        )}
+                      </div>
                       {isAnswered && choice.id === currentWord.id && (
                         <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-sage-600 flex-shrink-0" />
                       )}
@@ -251,6 +266,37 @@ export default function QuizMode({ words = [], onCompleteQuiz }) {
                   );
                 })}
               </div>
+
+              {/* Explanation & Learning Card (Only shown AFTER answering) */}
+              {isAnswered && (
+                <div className="mt-6 p-5 sm:p-6 bg-cream-50 rounded-2xl border border-cream-300 space-y-2.5 animate-fade-in text-xs sm:text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-latte-700 uppercase tracking-wider">💡 題解核心 (Answer Details)</span>
+                    <span className="font-mono text-cozyDark-200">{currentWord.ipa}</span>
+                  </div>
+                  <div>
+                    <strong className="text-latte-800 text-sm sm:text-base font-black">{currentWord.word}</strong>
+                    {currentWord.pos && (
+                      <span className="ml-1.5 font-bold italic text-latte-600 bg-latte-100 px-2 py-0.5 rounded-md">
+                        {currentWord.pos}
+                      </span>
+                    )}
+                    {currentWord.chinese && (
+                      <span className="ml-2 font-bold text-latte-800">：{currentWord.chinese}</span>
+                    )}
+                  </div>
+                  {currentWord.simpleDefinition && (
+                    <div className="text-cozyDark-400">
+                      <strong className="text-latte-700">英英釋義：</strong>"{currentWord.simpleDefinition}"
+                    </div>
+                  )}
+                  {currentWord.exampleZh && (
+                    <div className="text-cozyDark-300">
+                      <strong className="text-latte-700">例句翻譯：</strong>{currentWord.exampleZh}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             /* Dictation Mode */

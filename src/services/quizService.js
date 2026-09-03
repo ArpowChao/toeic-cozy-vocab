@@ -1,3 +1,5 @@
+import { TOEIC_SEED_WORDS } from '../data/toeicSeedWords.js';
+
 function shuffle(items, random = Math.random) {
   const copy = [...items];
   for (let index = copy.length - 1; index > 0; index -= 1) {
@@ -11,15 +13,51 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function maskWord(text, word) {
+/**
+ * Builds an inflection-aware regex for masking word in text.
+ * Covers:
+ * - base form
+ * - plurals / 3rd person singular (-s, -es, -ies)
+ * - past tense / participle (-d, -ed, -ied)
+ * - progressive / gerund (-ing, including dropping 'e' or doubled consonants)
+ */
+export function buildWordMaskRegex(word) {
+  const clean = (word || '').trim().toLowerCase();
+  if (!clean) return null;
+
+  const stems = new Set();
+  stems.add(escapeRegExp(clean));
+
+  if (clean.endsWith('e') && clean.length > 2) {
+    const withoutE = escapeRegExp(clean.slice(0, -1));
+    stems.add(`${withoutE}(?:e[ds]?|ing|es)?`);
+  } else if (clean.endsWith('y') && clean.length > 2) {
+    const withoutY = escapeRegExp(clean.slice(0, -1));
+    stems.add(`${withoutY}(?:y|ies|ied|ying)`);
+  } else {
+    const escaped = escapeRegExp(clean);
+    const lastChar = clean.slice(-1);
+    if (/[bdfglmnprt]/.test(lastChar) && clean.length > 2) {
+      stems.add(`${escaped}(?:${lastChar}(?:ed|ing))?`);
+    }
+    stems.add(`${escaped}(?:s|es|ed|ing|d)?`);
+  }
+
+  const pattern = Array.from(stems).join('|');
+  return new RegExp(`\\b(?:${pattern})\\b`, 'gi');
+}
+
+export function maskWord(text, word) {
   if (!text || !word) return text || '';
-  return text.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi'), '_______');
+  const regex = buildWordMaskRegex(word);
+  if (!regex) return text;
+  return text.replace(regex, '_______');
 }
 
 export function isCustomWord(word) {
   return Boolean(
-       word?.id?.startsWith('custom-') ||
-       word?.id?.startsWith('batch-') ||
+    word?.id?.startsWith('custom-') ||
+    word?.id?.startsWith('batch-') ||
     word?.category === '自訂生詞'
   );
 }
@@ -45,7 +83,7 @@ export function buildChoiceClue(word) {
   if (definition) {
     return {
       label: '英英提示 (Definition)',
-      text: definition,
+      text: maskWord(definition, word.word),
     };
   }
 
@@ -64,16 +102,44 @@ export function buildQuizTargets(
   return shuffle(candidates, random).slice(0, limit);
 }
 
-export function buildChoices(correctWord, allWords, random = Math.random) {
+export function buildChoices(correctWord, allWords = [], random = Math.random) {
   if (!correctWord) return [];
 
   const seen = new Set([correctWord.word.toLowerCase()]);
-  const distractors = shuffle(allWords || [], random).filter((word) => {
-    const normalized = word?.word?.toLowerCase();
-    if (!normalized || word.id === correctWord.id || seen.has(normalized)) return false;
-    seen.add(normalized);
-    return true;
-  }).slice(0, 3);
+  const pool = [...(allWords || []), ...TOEIC_SEED_WORDS];
+
+  // 1. First preference: same part of speech (if pos is known)
+  const targetPos = correctWord.pos?.trim().toLowerCase();
+  const samePosCandidates = pool.filter((w) => {
+    const norm = w?.word?.toLowerCase();
+    if (!norm || seen.has(norm)) return false;
+    const wPos = w?.pos?.trim().toLowerCase();
+    return targetPos && wPos === targetPos;
+  });
+
+  const distractors = [];
+  const shuffledSamePos = shuffle(samePosCandidates, random);
+  for (const w of shuffledSamePos) {
+    const norm = w.word.toLowerCase();
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      distractors.push(w);
+      if (distractors.length >= 3) break;
+    }
+  }
+
+  // 2. Fill remaining from general pool if needed
+  if (distractors.length < 3) {
+    const shuffledGeneral = shuffle(pool, random);
+    for (const w of shuffledGeneral) {
+      const norm = w?.word?.toLowerCase();
+      if (norm && !seen.has(norm)) {
+        seen.add(norm);
+        distractors.push(w);
+        if (distractors.length >= 3) break;
+      }
+    }
+  }
 
   return shuffle([correctWord, ...distractors], random);
 }

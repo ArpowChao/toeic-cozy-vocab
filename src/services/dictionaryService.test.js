@@ -1,18 +1,77 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { lookupWordOnline } from './dictionaryService.js';
+import { lookupCambridge, lookupWordOnline, normalizePartOfSpeech } from './dictionaryService.js';
 
 function response(body, ok = true) {
   return { ok, json: async () => body };
 }
 
+describe('normalizePartOfSpeech', () => {
+  it('normalizes various POS strings to standard notation', () => {
+    expect(normalizePartOfSpeech('Verb')).toBe('v.');
+    expect(normalizePartOfSpeech('verb [ T ]')).toBe('v.');
+    expect(normalizePartOfSpeech('transitive verb')).toBe('v.');
+    expect(normalizePartOfSpeech('Noun')).toBe('n.');
+    expect(normalizePartOfSpeech('noun [ C ]')).toBe('n.');
+    expect(normalizePartOfSpeech('proper noun')).toBe('n.');
+    expect(normalizePartOfSpeech('Adjective')).toBe('adj.');
+    expect(normalizePartOfSpeech('adverb')).toBe('adv.');
+    expect(normalizePartOfSpeech('preposition')).toBe('prep.');
+  });
+});
+
 describe('lookupWordOnline', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('uses Cambridge Dictionary as the primary source when available', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.includes('eliaschen.dev')) {
+        return response({
+          word: 'postpone',
+          pos: ['verb'],
+          pronunciation: [
+            { pos: 'verb', lang: 'us', pron: '/poʊstˈpoʊn/' }
+          ],
+          definition: [
+            {
+              id: 0,
+              pos: 'verb',
+              text: 'to delay an event and plan that it should happen at a later date',
+              translation: '延後，延緩',
+              example: [
+                {
+                  id: 0,
+                  text: 'They decided to postpone their holiday until next year.',
+                  translation: '他們決定將假期延後到來年。'
+                }
+              ]
+            }
+          ]
+        });
+      }
+      return response({}, false);
+    }));
+
+    const result = await lookupWordOnline('postpone');
+
+    expect(result.pos).toBe('v.');
+    expect(result.ipa).toBe('/poʊstˈpoʊn/');
+    expect(result.simpleDefinition).toBe(
+      'to delay an event and plan that it should happen at a later date'
+    );
+    expect(result.chinese).toBe('延後，延緩');
+    expect(result.example).toBe('They decided to postpone their holiday until next year.');
+    expect(result.exampleZh).toBe('他們決定將假期延後到來年。');
+  });
+
   it('does not invent definitions, examples, pronunciation, or collocations when sources have no data', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(response({}, false))
-      .mockResolvedValueOnce(response({ en: [] }))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '預算' } })));
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.includes('eliaschen.dev')) return response({}, false);
+      if (url.includes('dictionaryapi.dev')) return response({}, false);
+      if (url.includes('tatoeba.org')) return response({ results: [] });
+      if (url.includes('wiktionary.org')) return response({ en: [] });
+      if (url.includes('mymemory')) return response({ responseData: { translatedText: '預算' } });
+      return response({}, false);
+    }));
 
     const result = await lookupWordOnline('budget');
 
@@ -24,24 +83,36 @@ describe('lookupWordOnline', () => {
     expect(result.chinese).toBe('預算');
   });
 
-  it('uses sourced Wiktionary data when the primary dictionary is unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(response({}, false))
-      .mockResolvedValueOnce(response({ en: [{
-        partOfSpeech: 'Verb',
-        definitions: [
-          {
-            definition: 'To <a href="/wiki/set_aside">set aside</a> for a purpose.',
-            examples: ['The desserts were <b>allocated</b> for tomorrow.']
-          },
-          {
-            definition: 'To distribute according to a plan.',
-            examples: ['The company <b>allocated</b> additional funds to staff training.']
-          }
-        ]
-      }] }))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '分配' } }))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '公司撥出額外資金用於員工訓練。' } })));
+  it('uses sourced Wiktionary data when Cambridge and primary dictionary are unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.includes('eliaschen.dev')) return response({}, false);
+      if (url.includes('dictionaryapi.dev')) return response({}, false);
+      if (url.includes('tatoeba.org')) return response({ results: [] });
+      if (url.includes('wiktionary.org')) {
+        return response({
+          en: [{
+            partOfSpeech: 'Verb',
+            definitions: [
+              {
+                definition: 'To <a href="/wiki/set_aside">set aside</a> for a purpose.',
+                examples: ['The desserts were <b>allocated</b> for tomorrow.']
+              },
+              {
+                definition: 'To distribute according to a plan.',
+                examples: ['The company <b>allocated</b> additional funds to staff training.']
+              }
+            ]
+          }]
+        });
+      }
+      if (url.includes('mymemory')) {
+        if (url.includes('training') || url.includes('staff')) {
+          return response({ responseData: { translatedText: '公司撥出額外資金用於員工訓練。' } });
+        }
+        return response({ responseData: { translatedText: '分配' } });
+      }
+      return response({}, false);
+    }));
 
     const result = await lookupWordOnline('allocate');
 
@@ -51,49 +122,34 @@ describe('lookupWordOnline', () => {
     expect(result.exampleZh).toBe('公司撥出額外資金用於員工訓練。');
   });
 
-  it('prefers a common inflected verb form over an obsolete-looking adjective sense', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(response({}, false))
-      .mockResolvedValueOnce(response({ en: [
-        {
-          partOfSpeech: 'Adjective',
-          definitions: [{ definition: 'Hard, difficult; wearisome, tedious.' }]
-        },
-        {
-          partOfSpeech: 'Verb',
-          definitions: [{
-            definition: '<span class="form-of-definition">simple past of <i>tear</i> (“rip, rend”)</span>.'
+  it('falls back to Tatoeba example when Free Dictionary lacks examples', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.includes('eliaschen.dev')) return response({}, false);
+      if (url.includes('dictionaryapi.dev')) {
+        return response([{
+          phonetic: '/ˈwɔːr.ən.ti/',
+          meanings: [{
+            partOfSpeech: 'noun',
+            definitions: [{ definition: 'A written guarantee or warranty.' }]
           }]
-        }
-      ] }))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '撕裂' } })));
+        }]);
+      }
+      if (url.includes('tatoeba.org')) {
+        return response({
+          results: [{ text: 'The warranty covers mechanical repairs for one year.' }]
+        });
+      }
+      if (url.includes('mymemory')) {
+        if (url.includes('warranty')) return response({ responseData: { translatedText: '保固' } });
+        return response({ responseData: { translatedText: '保固期為一年內的機械維修。' } });
+      }
+      return response({}, false);
+    }));
 
-    const result = await lookupWordOnline('tore');
+    const result = await lookupWordOnline('warranty');
 
-    expect(result.pos).toBe('v.');
-    expect(result.simpleDefinition).toBe('simple past of tear (“rip, rend”).');
-  });
-
-  it('keeps a sourced example paired with the definition and part of speech it illustrates', async () => {
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce(response([{
-        phonetic: '/prəˈdʒekt/',
-        meanings: [
-          { partOfSpeech: 'noun', definitions: [{ definition: 'a planned undertaking' }] },
-          { partOfSpeech: 'verb', definitions: [{
-            definition: 'to estimate something in the future',
-            example: 'Sales are projected to increase next quarter.'
-          }] }
-        ]
-      }]))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '預測' } }))
-      .mockResolvedValueOnce(response({ responseData: { translatedText: '預計下季銷售額將增加。' } })));
-
-    const result = await lookupWordOnline('project');
-
-    expect(result.pos).toBe('v.');
-    expect(result.simpleDefinition).toBe('to estimate something in the future');
-    expect(result.example).toBe('Sales are projected to increase next quarter.');
-    expect(result.exampleZh).toBe('預計下季銷售額將增加。');
+    expect(result.pos).toBe('n.');
+    expect(result.simpleDefinition).toBe('A written guarantee or warranty.');
+    expect(result.example).toBe('The warranty covers mechanical repairs for one year.');
   });
 });

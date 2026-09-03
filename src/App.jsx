@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar.jsx';
 import WordCard from './components/WordCard.jsx';
 import AddWordModal from './components/AddWordModal.jsx';
@@ -12,6 +12,7 @@ import {
   initStorage,
   getAllWords,
   saveWord,
+  saveWordsBatch,
   recordStudyActivity,
   getStudyLogs,
 } from './services/storageService.js';
@@ -21,6 +22,7 @@ import {
   calculateLearningStats,
 } from './services/srsAlgorithm.js';
 import { repairFabricatedWordData } from './services/wordDataRepairService.js';
+import { syncWithCloud, pushWordsToGas, getSavedGasUrl } from './services/gasSyncService.js';
 import confetti from 'canvas-confetti';
 import { Sparkles, CheckCircle2, RotateCcw, Plus, Flame } from 'lucide-react';
 
@@ -31,13 +33,20 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced' | 'error'
 
-  // Load initial words and logs from IndexedDB
+  const pushTimerRef = useRef(null);
+
+  // Load initial words and logs from IndexedDB, then auto-sync from cloud in background
   useEffect(() => {
     loadData();
+    return () => {
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    };
   }, []);
 
   const loadData = async () => {
+    // 1. Fast local load
     const loadedWords = await initStorage();
     const repairResult = await repairFabricatedWordData(loadedWords);
     setWords(repairResult.words);
@@ -45,6 +54,51 @@ export default function App() {
     setStudyLogs(logs);
     const todayStr = new Date().toISOString().split('T')[0];
     setTodayCompletedCount(logs[todayStr] || 0);
+
+    // 2. Background Auto-Pull from Google Sheets
+    const gasUrl = getSavedGasUrl();
+    if (gasUrl) {
+      setSyncStatus('syncing');
+      try {
+        const syncResult = await syncWithCloud(repairResult.words, gasUrl);
+        if (syncResult.synced) {
+          await saveWordsBatch(syncResult.words);
+          const cloudRepair = await repairFabricatedWordData(syncResult.words);
+          setWords(cloudRepair.words);
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('error');
+        }
+      } catch (err) {
+        console.warn('Background auto-pull failed:', err);
+        setSyncStatus('error');
+      }
+    }
+  };
+
+  // Debounced background cloud push for review progress
+  const scheduleCloudPush = (latestWords, immediate = false) => {
+    const gasUrl = getSavedGasUrl();
+    if (!gasUrl) return;
+
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+
+    const executePush = async () => {
+      try {
+        setSyncStatus('syncing');
+        await pushWordsToGas(latestWords, gasUrl);
+        setSyncStatus('synced');
+      } catch (err) {
+        console.warn('Background auto-push failed:', err);
+        setSyncStatus('error');
+      }
+    };
+
+    if (immediate) {
+      executePush();
+    } else {
+      pushTimerRef.current = setTimeout(executePush, 2500);
+    }
   };
 
   // Filter due words for today's review session
@@ -61,11 +115,15 @@ export default function App() {
     await recordStudyActivity(1);
 
     // Update in-memory state
-    setWords((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+    const nextWords = words.map((w) => (w.id === updated.id ? updated : w));
+    setWords(nextWords);
     setTodayCompletedCount((prev) => prev + 1);
 
+    const isLastDueWord = dueWords.length === 1;
+    scheduleCloudPush(nextWords, isLastDueWord);
+
     // If this was the last due word, celebrate!
-    if (dueWords.length === 1) {
+    if (isLastDueWord) {
       confetti({
         particleCount: 100,
         spread: 90,
@@ -81,10 +139,15 @@ export default function App() {
     } else {
       setWords((prev) => [newWordOrWords, ...prev]);
     }
+    setSyncStatus('synced');
   };
 
   const handleWordDeleted = (deletedId) => {
-    setWords((prev) => prev.filter((w) => w.id !== deletedId));
+    setWords((prev) => {
+      const next = prev.filter((w) => w.id !== deletedId);
+      scheduleCloudPush(next, true);
+      return next;
+    });
   };
 
   return (
@@ -96,6 +159,7 @@ export default function App() {
         onOpenAdd={() => setIsAddModalOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         dueCount={dueWords.length}
+        syncStatus={syncStatus}
       />
 
       {/* Main Content Area */}

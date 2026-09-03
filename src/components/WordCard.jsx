@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, Sparkles, Eye, EyeOff, BookOpen, Layers, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Volume2, Sparkles, Eye, EyeOff, BookOpen, Layers, ArrowRight, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { speakText, soundEffects } from '../services/ttsService.js';
 import { RATING } from '../services/srsAlgorithm.js';
 
@@ -96,7 +96,7 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
             )}
           </div>
 
-          {/* Quick Audio Controls */}
+          {/* Quick Audio & Dictionary Controls */}
           <div className="flex items-center gap-2 bg-cream-100 p-1.5 rounded-2xl border border-cream-200">
             <button
               onClick={() => handlePronounce(word.word, 'en-US')}
@@ -112,6 +112,15 @@ export default function WordCard({ word, onRate, autoPlayAudio = true }) {
             >
               <Volume2 className="w-4 h-4 text-latte-500" /> 🇬🇧 英音
             </button>
+            <a
+              href={`https://dictionary.cambridge.org/zht/%E8%A9%9E%E5%85%B8/%E8%8B%B1%E8%AA%9E-%E6%BC%A2%E8%AA%9E-%E7%B9%81%E9%AB%94/${encodeURIComponent(word.word)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs sm:text-sm font-bold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-latte-100 text-latte-700 shadow-sm transition flex items-center gap-1 active:scale-95"
+              title="在劍橋詞典官方網站查閱詳細用法"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-latte-500" /> 劍橋
+            </a>
           </div>
         </div>
 

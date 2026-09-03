@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Volume2, Trash2, Eye, Tag, Filter } from 'lucide-react';
+import { Search, Volume2, Trash2, Eye, Tag, Filter, ExternalLink } from 'lucide-react';
 import { speakText } from '../services/ttsService.js';
 import { deleteWord } from '../services/storageService.js';
 
@@ -114,10 +114,12 @@ export default function WordList({ words = [], onWordDeleted }) {
                     <span className="text-xl sm:text-2xl font-black text-latte-800 tracking-tight">
                       {item.word}
                     </span>
-                    <span className="text-xs sm:text-sm font-mono text-cozyDark-200">{item.ipa}</span>
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-cream-200 text-latte-700">
-                      {item.pos}
-                    </span>
+                    {item.ipa && <span className="text-xs sm:text-sm font-mono text-cozyDark-200">{item.ipa}</span>}
+                    {item.pos?.trim() && (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-cream-200 text-latte-700">
+                        {item.pos}
+                      </span>
+                    )}
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-latte-100 text-latte-700 font-bold border border-latte-200">
                       {item.level || 'L2'}
                     </span>
@@ -181,10 +183,21 @@ export default function WordList({ words = [], onWordDeleted }) {
                       💡 <span className="font-bold">多益考點：</span> {item.toeicTip}
                     </div>
                   )}
-                  <div className="flex gap-4 text-xs text-cozyDark-200 pt-1 font-mono">
-                    <span>複習次數: {item.repetition || 0}</span>
-                    <span>間隔: {item.interval || 0}天</span>
-                    <span>到期日: {item.dueDate || '尚未排程'}</span>
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-cream-200/80">
+                    <div className="flex gap-4 text-xs text-cozyDark-200 font-mono">
+                      <span>複習次數: {item.repetition || 0}</span>
+                      <span>間隔: {item.interval || 0}天</span>
+                      <span>到期日: {item.dueDate || '尚未排程'}</span>
+                    </div>
+                    <a
+                      href={`https://dictionary.cambridge.org/zht/%E8%A9%9E%E5%85%B8/%E8%8B%B1%E8%AA%9E-%E6%BC%A2%E8%AA%9E-%E7%B9%81%E9%AB%94/${encodeURIComponent(item.word)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-latte-600 hover:text-latte-800 flex items-center gap-1 hover:underline"
+                      title="在劍橋詞典官方網站查閱"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> 劍橋詞典
+                    </a>
                   </div>
                 </div>
               )}

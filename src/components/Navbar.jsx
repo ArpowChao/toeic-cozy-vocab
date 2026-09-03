@@ -1,7 +1,7 @@
 import React from 'react';
-import { BookOpen, Search, Trophy, Sparkles, Plus, Settings, Flame } from 'lucide-react';
+import { BookOpen, Search, Trophy, Sparkles, Plus, Settings, Flame, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettings, dueCount = 0 }) {
+export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettings, dueCount = 0, syncStatus = 'idle' }) {
   const navItems = [
     { id: 'study', label: '沉浸自習', icon: BookOpen, badge: dueCount > 0 ? dueCount : null },
     { id: 'quiz', label: '實戰測驗', icon: Sparkles },
@@ -58,8 +58,39 @@ export default function Navbar({ activeTab, onSelectTab, onOpenAdd, onOpenSettin
           })}
         </nav>
 
-        {/* Action Buttons: Add Word & Settings */}
-        <div className="flex items-center gap-2.5">
+        {/* Action Buttons: Sync Indicator, Add Word & Settings */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Cloud Sync Status Indicator */}
+          {syncStatus === 'syncing' && (
+            <div
+              className="hidden md:flex items-center gap-1.5 text-xs text-amberGold-800 bg-amberGold-100/90 border border-amberGold-300 px-3 py-1.5 rounded-2xl font-bold animate-pulse shadow-2xs"
+              title="正在與 Google Sheets 自動同步最新進度..."
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amberGold-600" />
+              <span>雲端同步中...</span>
+            </div>
+          )}
+          {syncStatus === 'synced' && (
+            <button
+              onClick={onOpenSettings}
+              className="hidden md:flex items-center gap-1.5 text-xs text-sage-800 bg-sage-50 hover:bg-sage-100 border border-sage-200 px-3 py-1.5 rounded-2xl font-bold transition shadow-2xs"
+              title="Google Sheets 雲端已同步（點擊開啟設定）"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-sage-600" />
+              <span>雲端已同步</span>
+            </button>
+          )}
+          {syncStatus === 'error' && (
+            <button
+              onClick={onOpenSettings}
+              className="hidden md:flex items-center gap-1.5 text-xs text-terracotta-800 bg-terracotta-50 hover:bg-terracotta-100 border border-terracotta-200 px-3 py-1.5 rounded-2xl font-bold transition shadow-2xs"
+              title="雲端連線失敗，點擊檢查 GAS 網址設定"
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-terracotta-500" />
+              <span>同步未連線</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenAdd}
             className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-2xl bg-latte-600 hover:bg-latte-700 text-white text-xs sm:text-sm font-bold shadow-sm transition active:scale-95"
